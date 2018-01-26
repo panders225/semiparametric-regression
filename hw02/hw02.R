@@ -10,7 +10,7 @@
 install.packages("C:/Users/Philip/Schools/TAMU/STAT_689/homework/HRW_1.01.09.tar.gz", repos=NULL, type="source")
 library("HRW")
 library("data.table")
-library("dplyr")
+library("tidyverse")
 
 
 # read in the data
