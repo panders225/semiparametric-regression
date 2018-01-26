@@ -43,7 +43,7 @@ abline(lin_mod, lwd=3, lty=2)
 # 4) Fit a quadratic model and add the fit to the scatterplot
 ##################
 
-quad_mod <- lm(strontium.ratio ~ age + I(age**2)
+quad_mod <- lm(strontium.ratio ~ age + I(age^2)
                ,data=fossil)
 
 x_vals <- seq(min(fossil$age), max(fossil$age), length=100)
@@ -80,8 +80,9 @@ lines(x_vals, quart_vals, lwd=3, lty=6)
 
 # this did not result in a dramatic improvement over the cubic model
 
-anova(cub_mod, quart_mod) # F-test has no significant difference
-
+anova(cub_mod, quart_mod) 
+# F-test has no significant difference
+# use the relatively simpler, cubic model
 
 legend(91, 0.70728
        , legend=c("Linear", "Quadratic", "Cubic", "Quartic")
