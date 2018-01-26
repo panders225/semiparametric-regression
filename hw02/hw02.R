@@ -49,6 +49,7 @@ par(mfrow=c(1,1))
 summary(lin_mod)
 
 # we have a statistically significant relationship between Y and X
+# with a p-value of 0.00216
 
 plot(skeena$spawners, skeena$recruits)
 abline(lin_mod)
@@ -85,34 +86,49 @@ summary(skeena)
 # 4) Does the log-log regression show heteroskedacticity?
 ##################
 
-# The log-log regression has substantially reduced the evidence of 
-# hetereoskedacticity.  The variance of the residuals slightly increases
-# as we move along the fitted values, but it is not as dramatic as in the 
-# non-transformed regression
+# The log-log regression still has evidence of heteroscedacticity present
+# the residuals demonstrate higher variance as we move to higher levels
+# of fitted values
 
 ##################
 # 5) Plot the fitted line and show the polygon overlay
 ##################
-help(polygon)
 
-plot(log(skeena$spawners), log(skeena$recruits)
-     , main="Transformed Recruits vs. Spawners"
-     , xlab="ln(spawners)"
-     , ylab="ln(recruits)"
-     )
-mtext("Linear Regression Overlay")
-abline(lin_mod2)
+ord <- order(log(skeena$spawners))
+x <- skeena$spawners[ord] %>% log()
+y <- skeena$recruits[ord] %>% log()
+pred_vec <- skeena$spawners
 
-newx <- seq(min(log(skeena$spawners)), max(log(skeena$spawners)), length.out=100)
-preds <- predict(lin_mod2, newdata=data.frame(spawners=newx)
-                 , interval="confidence")
-
-plot(log(skeena$recruits) ~ log(skeena$spawners), type='n')
-polygon(c(rev(newx), newx), c(rev(preds[,3]), preds[,2]), col='grey80', border=NA)
-abline(lin_mod2)
-lines(newx, preds[ ,3], lty = 'dashed', col = 'red')
-lines(newx, preds[ ,2], lty = 'dashed', col = 'red')
+pred <- predict(lin_mod2
+                , newdata=data.frame(spawners=pred_vec)
+                , se.fit=TRUE
+                )
 
 
+# using n-2 df because we have n obs with 2 estimated parameters
+t <- qt(0.975, df=n-2)
+upperCI <- pred$fit[ord] + (t * pred$se.fit[ord])
+lowerCI <- pred$fit[ord] - (t * pred$se.fit[ord])
 
+# finally make our plot
+plot(1, type="n"
+     , xlim=c(min(x), max(x))
+     , ylim=c(min(y), max(y))
+     , xlab="Log(Spawners)"
+     , ylab="Log(Recruits)"
+     , main="Skeena Recruits vs. Spawners"
+    )
+mtext("Logarithmic Transformations Applied")
+
+polygon(x=c(x, rev(x))
+        , y=c(upperCI, rev(lowerCI))
+        , col='gray'
+        , border=NA
+        )
+
+lines(x, pred$fit[ord]
+      , type='l'
+      , col='black'
+      , lwd=3
+      )
 
