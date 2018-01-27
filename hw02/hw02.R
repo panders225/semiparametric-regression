@@ -1,5 +1,3 @@
-
-
 ##################
 # HW02 - Philip Anderson
 # STAT 689
@@ -7,7 +5,7 @@
 
 # third-party modules
 
-install.packages("C:/Users/Philip/Schools/TAMU/STAT_689/homework/HRW_1.01.09.tar.gz", repos=NULL, type="source")
+#install.packages("C:/Users/Philip/Schools/TAMU/STAT_689/homework/HRW_1.01.09.tar.gz", repos=NULL, type="source")
 library("HRW")
 library("data.table")
 library("tidyverse")
@@ -97,6 +95,7 @@ summary(skeena)
 ord <- order(log(skeena$spawners))
 x <- skeena$spawners[ord] %>% log()
 y <- skeena$recruits[ord] %>% log()
+n <- length(x)
 pred_vec <- skeena$spawners
 
 pred <- predict(lin_mod2
