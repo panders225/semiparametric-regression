@@ -1,0 +1,102 @@
+---
+title: "Assignment 05 - STAT 689"
+author: "Philip Anderson: panders2@tamu.edu"
+date: "February 7, 2018"
+output: pdf_document
+---
+
+```{r, message=FALSE}
+# import third-party modules
+library("mgcv")
+```
+
+Import our data
+
+```{r}
+fossil <- read.csv("C:/Users/Philip/Schools/TAMU/STAT_689/homework/semiparametric-regression/misc/fossil2.csv")
+names(fossil) <- tolower(names(fossil))
+summary(fossil)
+```
+
+Fit GAM's with 4, 8, and 23 knots
+
+```{r}
+fossil_mod <- function(knots=8) {
+  mod <- mgcv::gam(strontium.ratio ~ s(age, k=knots, bs="cr")
+                   , data=fossil
+                   )
+  return(mod)
+              }
+
+gam4 <- fossil_mod(knots=4)
+gam8 <- fossil_mod(knots=8)
+gam23 <- fossil_mod(knots=23)
+
+```
+
+
+
+# Question 1
+For each of the three models, plot the absolute fitted residuals against the predicted values.
+
+```{r}
+hs_plotter <- function(gam_obj, title_prompt="Fitted Vals vs. Abs. Resid.") {
+        plot(fitted(gam_obj), abs(gam_obj$residuals)
+             , xlab="Predicted Values"
+             , ylab="Absolute Residuals"
+             , main=title_prompt
+             )
+
+}
+
+hs_plotter(gam_obj=gam4, title_prompt="GAM with 4 Knots Hetereoscedacticity Eval.")
+hs_plotter(gam_obj=gam8, title_prompt="GAM with 8 Knots Hetereoscedacticity Eval.")
+hs_plotter(gam_obj=gam23, title_prompt="GAM with 23 Knots Hetereoscedacticity Eval.")
+
+```
+
+
+
+
+
+# Question 2
+Give the ratio of the maximum fitted absolute residual to the minimum absolute fitted residual.
+
+```{r}
+ratio_finder <- function(mod_obj, precision=2) { 
+  # find the ratio of the max value of abs(resid) to the min value
+     ratio <- round(max(abs(mod_obj$residuals)) / min(abs(mod_obj$residuals)), precision)
+     return(ratio)
+}
+
+paste0("GAM with 4 knots ratio is: ", ratio_finder(mod_obj=gam4))
+paste0("GAM with 8 knots ratio is: ", ratio_finder(mod_obj=gam8))
+paste0("GAM with 23 knots ratio is: ", ratio_finder(mod_obj=gam23))
+
+```
+
+
+
+# Question 3
+All three of the ratios dramatically exceed our rule of thumb value of 9.
+
+```{r}
+data.frame(K=c(4,8,23)
+          , Ratio=c(ratio_finder(mod_obj=gam4)
+                    , ratio_finder(mod_obj=gam8)
+                    , ratio_finder(mod_obj=gam23)
+                    )
+           )
+```
+
+# Question 4
+The failure of our results to match the residual ratio heuristic indicates that our model fails to capture the non-constant variance in our single predictor variable.  It indicates that our model is widely missing in making at least one prediction, which is the consequence of heteroscedacticity.
+
+# Question 5 
+Give a verbal description of what K is. 
+
+K is the number of basis dimensions, or knots, that our smoothed regression line will be fit with. These are the points at which our fit line will be permitted to deviate from linearity.  It is selected through identifying the unique quantiles of the x variable, with a forumula such as:
+
+$$
+knot \ location = \frac{k}{K-1}
+$$
