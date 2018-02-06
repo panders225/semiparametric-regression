@@ -23,8 +23,7 @@ Fit GAM's with 4, 8, and 23 knots
 ```{r}
 fossil_mod <- function(knots=8) {
   mod <- mgcv::gam(strontium.ratio ~ s(age, k=knots, bs="cr")
-                   , data=fossil
-                   )
+                   , data=fossil )
   return(mod)
               }
 
@@ -40,24 +39,32 @@ gam23 <- fossil_mod(knots=23)
 For each of the three models, plot the absolute fitted residuals against the predicted values.
 
 ```{r}
-hs_plotter <- function(gam_obj, title_prompt="Fitted Vals vs. Abs. Resid.") {
-        plot(fitted(gam_obj), abs(gam_obj$residuals)
-             , xlab="Predicted Values"
-             , ylab="Absolute Residuals"
-             , main=title_prompt
-             )
+plot(1, type="n"
+     , xlim=c(min(gam23$residuals), max(gam4$fitted.values)) 
+     , ylim=c(0, 0.00020)
+     , xlab="Predicted Values"
+     , ylab="Absolute Residuals"
+     , main="Absolute Residual Plot"
+     )
 
-}
+line_plotter <- function(gam_obj, lty=1, knots=8){
+      age_ord <- order(fossil$age)
+      x <- fitted(gam_obj)[age_ord]
+      y <- abs(gam_obj$residuals)[age_ord]
+      gam_obj_abs <- mgcv::gam(y ~ s(x, k=knots, bs="cr"))
+      lines(x, fitted(gam_obj_abs), lwd=2.5, lty=lty)
+      }
 
-hs_plotter(gam_obj=gam4, title_prompt="GAM with 4 Knots Hetereoscedacticity Eval.")
-hs_plotter(gam_obj=gam8, title_prompt="GAM with 8 Knots Hetereoscedacticity Eval.")
-hs_plotter(gam_obj=gam23, title_prompt="GAM with 23 Knots Hetereoscedacticity Eval.")
+line_plotter(gam_obj=gam4, lty=1, knots=4)
+line_plotter(gam_obj=gam8, lty=2, knots=8)
+line_plotter(gam_obj=gam23, lty=3, knots=23)
 
+legend(0.70726, 0.00019
+       , c("gam4", "gam8", "gam23")
+       , lty=c(1, 2, 3)
+       , lwd= rep(2.5,3)
+       )
 ```
-
-
-
-
 
 # Question 2
 Give the ratio of the maximum fitted absolute residual to the minimum absolute fitted residual.
@@ -75,10 +82,8 @@ paste0("GAM with 23 knots ratio is: ", ratio_finder(mod_obj=gam23))
 
 ```
 
-
-
 # Question 3
-All three of the ratios dramatically exceed our rule of thumb value of 9.
+All three of the ratios dramatically exceed our rule of thumb value of 3.
 
 ```{r}
 data.frame(K=c(4,8,23)
@@ -90,13 +95,40 @@ data.frame(K=c(4,8,23)
 ```
 
 # Question 4
-The failure of our results to match the residual ratio heuristic indicates that our model fails to capture the non-constant variance in our single predictor variable.  It indicates that our model is widely missing in making at least one prediction, which is the consequence of heteroscedacticity.
+The failure of our results to fall within the bounds of the residual ratio heuristic indicates that our model fails to capture the non-constant variance present in our single predictor variable.  It indicates that our model is widely missing in making at least one prediction, which is the consequence of heteroscedacticity.  I have included more extensive residual plots in the Appendix of this document, which more thoroughly demonstrate the problem.
 
 # Question 5 
 Give a verbal description of what K is. 
 
-K is the number of basis dimensions, or knots, that our smoothed regression line will be fit with. These are the points at which our fit line will be permitted to deviate from linearity.  It is selected through identifying the unique quantiles of the x variable, with a forumula such as:
+K is the number of basis dimensions, or knots, with which our smoothed regression line will be fit. These are the points at which our fitted line will be permitted to deviate from linearity.  It is selected through identifying the unique quantiles of the x variable, with a forumula such as:
 
 $$
 knot \ location = \frac{k}{K-1}
 $$
+
+
+# Appendix
+## Question 1 expanded.  I include distinct hetereoscedacticity plots for each of the fitted models (4, 8, and 23 knots).
+```{r}
+hs_plotter <- function(gam_obj, knots, title_prompt="Fitted Vals vs. Abs. Resid.", lty=1) {
+        # create a scatterplot and put a smooth regression on it
+        plot(fitted(gam_obj), abs(gam_obj$residuals)
+             , xlab="Predicted Values"
+             , ylab="Absolute Residuals"
+             , main=title_prompt
+             )
+        
+        age_ord <- order(fossil$age)
+        x <- fitted(gam_obj)[age_ord]
+        y <- abs(gam_obj$residuals)[age_ord]
+        gam_obj_abs <- mgcv::gam(y ~ s(x, k=knots, bs="cr"))
+        lines(x, fitted(gam_obj_abs), lwd=2.5, lty=lty)
+        
+
+}
+
+hs_plotter(gam_obj=gam4, knots=4, title_prompt="GAM with 4 Knots Hetereoscedacticity Eval.", lty=1)
+hs_plotter(gam_obj=gam8, knots=8, title_prompt="GAM with 8 Knots Hetereoscedacticity Eval.", lty=2)
+hs_plotter(gam_obj=gam23, knots=23, title_prompt="GAM with 23 Knots Hetereoscedacticity Eval.", lty=3)
+
+```
