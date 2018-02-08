@@ -1,0 +1,57 @@
+---
+title: "Assignment_06 - STAT 689"
+author: "Philip Anderson; panders2@tamu.edu"
+date: "2/14/2018"
+output: pdf_document
+---
+
+```{r, message=F}
+# import third-party modules
+library("HRW")
+library("tidyverse")
+```
+
+Read in our data
+```{r}
+fram <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/hw06/framington.csv")
+names(fram) <- tolower(names(fram))
+names(fram)
+
+```
+
+Create new variables for the systolic blood pressure readings and the two cholesterol measurements.
+
+```{r}
+# systolic blood pressure first
+fram$lsbp <- log(mean(c(fram$sbp21, fram$sbp22, fram$sbp31, fram$sbp32)) - 50)
+# cholesterol measurements second
+fram$lcholest <- log(mean(c(fram$cholest2, fram$cholest3)))
+``` 
+
+Keep only the variables that we will be working with directly.
+
+```{r}
+fram2 <- fram %>%
+  dplyr::select(chd, age, smoker, lsbp, lcholest)
+head(fram2)
+```
+
+# Question 1
+Fit a multiple linear regression of LSBP on lcholest and smoker via "lm" function.  Produce a estimates, standard errors, and p-values.
+
+```{r}
+# fit model
+lin_mod <- lm(lsbp ~ lcholest + smoker, data=fram2)
+# produce summary
+summary(lin_mod)
+```
+
+
+```{r}
+fram2 %>% 
+  dplyr::select(lsbp, lcholest, smoker) %>%
+  head()
+
+```
+
+
