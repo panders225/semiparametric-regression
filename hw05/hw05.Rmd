@@ -40,7 +40,7 @@ For each of the three models, plot the absolute fitted residuals against the pre
 
 ```{r}
 plot(1, type="n"
-     , xlim=c(min(gam23$residuals), max(gam4$fitted.values)) 
+     , xlim=c(0.70725, 0.70750)
      , ylim=c(0, 0.00020)
      , xlab="Predicted Values"
      , ylab="Absolute Residuals"
@@ -103,7 +103,7 @@ Give a verbal description of what K is.
 K is the number of basis dimensions, or knots, with which our smoothed regression line will be fit. These are the points at which our fitted line will be permitted to deviate from linearity.  It is selected through identifying the unique quantiles of the x variable, with a forumula such as:
 
 $$
-knot \ location = \frac{k}{K-1}
+knot \ location = (\frac{k}{K-1})th \ quantile \ of \ unique \ x
 $$
 
 
