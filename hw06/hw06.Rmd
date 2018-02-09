@@ -9,6 +9,7 @@ output: pdf_document
 # import third-party modules
 library("HRW")
 library("tidyverse")
+library("mgcv")
 ```
 
 Read in our data
@@ -23,9 +24,9 @@ Create new variables for the systolic blood pressure readings and the two choles
 
 ```{r}
 # systolic blood pressure first
-fram$lsbp <- log(mean(c(fram$sbp21, fram$sbp22, fram$sbp31, fram$sbp32)) - 50)
+fram$lsbp <- log(((fram$sbp21 + fram$sbp22 + fram$sbp31 + fram$sbp32) / 4) - 50)
 # cholesterol measurements second
-fram$lcholest <- log(mean(c(fram$cholest2, fram$cholest3)))
+fram$lcholest <- log((fram$cholest2 + fram$cholest3) / 2)
 ``` 
 
 Keep only the variables that we will be working with directly.
@@ -41,17 +42,50 @@ Fit a multiple linear regression of LSBP on lcholest and smoker via "lm" functio
 
 ```{r}
 # fit model
-lin_mod <- lm(lsbp ~ lcholest + smoker, data=fram2)
+lin_mod <- lm(lsbp ~ smoker + lcholest
+              , data=fram2
+              )
 # produce summary
 summary(lin_mod)
 ```
 
 
-```{r}
-fram2 %>% 
-  dplyr::select(lsbp, lcholest, smoker) %>%
-  head()
+# Question 2
+Conduct web research on whether smokers have higher or lower blood pressure on average compared to non-smokers.
 
+WebMD indicates that individuals who smoke tend to have higher blood pressure than those who do not.  This is not consistent with my findings from Question 1, which indicate that participants who smoke have lower blood pressure than those who do not, conditional on our transformed cholesterol variable.  There is nothing in the documentation to indicate that smoker is not encoded with '1' as the positive class.  This is suspicious, and suggests that we need to check our data or revisit our model specification. 
+
+# Question 3
+The model produces the expectation of LSBP given smoking status _conditional on_ cholesterol.
+
+# Question 4
+Recreate the same model as in Question 1, but add in an interaction.
+
+```{r}
+lin_mod2 <- lm(lsbp ~ smoker + lcholest + smoker:lcholest
+              , data=fram2
+              )
+
+summary(lin_mod2)
 ```
 
+# Question 5
+Run a semiparametric ANCOVA with mgcv, the semiparametric version of an ANCOVA without an interaction.
+
+```{r}
+# making the smoker variable a factor, and ensuring that the reference level is 0
+semi_mod <- mgcv::gam(lsbp ~ relevel(factor(smoker), ref='0') + 
+                        s(lcholest, k=23, bs="cr")
+                      , data=fram2
+                      , method="REML"
+                     )
+summary(semi_mod)
+```
+
+# Question 6
+For the data in part 5, display a plot of the two lines, but without the data
+
+```{r} 
+plot(semi_mod)
+```
 
