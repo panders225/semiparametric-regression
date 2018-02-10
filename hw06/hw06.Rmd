@@ -219,16 +219,60 @@ anova(contrast_mod1, contrast_mod2, test="F")
 It appears that there is a significant difference between the two fits, for smoker and non-smoker.
 
 # Question 12
-Run native code using lme to fit LSBP vs. age
+Run native code using lme to fit LSBP vs. age.  
 
 ```{r}
-#mixed_mod <- nlme::lme(fixed=lsbp ~ age, data=fram2)
+x <- fram2$lcholest
+y <- fram2$lsbp
+numIntKnots <- 23
+intKnots <- quantile(unique(x), seq(0, 1, length=numIntKnots+2))[-c(1, numIntKnots+2)]
+a <- 1.01 * min(x) - 0.01*max(x)
+b <- 1.01 * max(x) - 0.01*min(x)
+Z <- HRW::ZOSull(x, range.x=c(a, b), intKnots=intKnots)
+dummyID <- factor(rep(1, length(x)))
+mm_fit <- nlme::lme(y ~ x, random=list(dummyID=pdIdent(~ -1+Z)))
+
 ```
 
-
+# Question 13
+Display the fit without data points.  Also provide a confidence band.
 
 ```{r}
-#summary(fram2)
+# extract our model coefficient
+betaHat <- mm_fit$coefficients$fixed
+uHat <- unlist(mm_fit$coefficients$random)
+ng <- 1001
+xg <- seq(a, b, length.out=ng)
+Xg <- cbind(rep(1, ng), xg)
+Zg <- HRW::ZOSull(xg, range.x=c(a,b), intKnots=intKnots)
+fHatg <- as.vector(Xg %*% betaHat + Zg %*% uHat)
+plot(x, y, type='n'
+     , xlab="Cholesterol"
+     , ylab="Blood Pressure"
+     , main='Blood Pressure by Cholesterol Mixed Model Fit'
+     )
+
+lines(xg, fHatg, col="darkgreen", lwd=2.5)
+
+
+```
+
+# Question 14
+Is the fit of our model statistically significant?
+
+```{r}
+anova(mm_fit)
+```
+
+The F-test indicates that the fit of our model is significant.
+
+# Question 15
+Test whether the fit is linear or quadratic vs. the need to do a semiparametric fit.
+
+```{r}
+
+mm_fit2 <- nlme::lme(y ~ x + x**2, random=list(dummyID=pdIdent(~ -1+Z)))
+summary(mm_fit2)
 ```
 
 
