@@ -10,6 +10,7 @@ output: pdf_document
 library("HRW")
 library("tidyverse")
 library("mgcv")
+library("nlme")
 ```
 
 Read in our data
@@ -100,7 +101,6 @@ f_hat_smoker <- predict(semi_mod
                         )
                         )
 
-
 f_hat_nosmoke <- predict(semi_mod
                          , newdata=data.frame(
                             smoker=rep('1', 1000)
@@ -111,18 +111,23 @@ f_hat_nosmoke <- predict(semi_mod
 
 
 ```{r}
+lineColors <- c("red", "dodgerblue")
+
 plot(fram2$lcholest, fram2$lsbp, type="n"
      , xlab="Cholesterol Variable"
      , ylab = "Blood Pressure Variable"
      , main="Blood Presure by Cholesterol ANCOVA comparison"
        )
 
-lines(x_var, f_hat_smoker, lty=2, lwd=2.5)
-lines(x_var, f_hat_nosmoke, lty=3, lwd=2.5)
+lines(x_var, f_hat_smoker, lty=2, lwd=2.5, col=lineColors[1])
+lines(x_var, f_hat_nosmoke, lty=3, lwd=2.5, col=lineColors[2])
 
 legend(4.8, 5
        , c("Smoker", "NonSmoker")
-       , lty=c(2,3))
+       , lty=c(2,3)
+       , lwd=rep(2.5, 2)
+       , col=c(lineColors[1], lineColors[2])
+       )
 ```
 
 
@@ -142,10 +147,88 @@ Run the semiparametric version of ANCOVA but with an interaction.
 semi_mod2 <- mgcv::gam(lsbp ~ factor(smoker)*lcholest +
                         s(lcholest, k=23, bs="cr")
                       , data=fram2
-                      , method="REML"
+#                      , method="REML"
                      )
 summary(semi_mod2)
 
+```
+
+From the above results, it does not appear that there is any sort of interaction present, as the p-value on the interaction term between  _smoker_ and _lcholest_ is not significant.
+
+# Question 9
+Display the fits of the above regressions, but without the data points.
+
+```{r}
+ele_num <- 1000
+x_vec <- seq(from=min(fram2$lcholest), to=max(fram2$lcholest), len=ele_num)
+fHat_smoke <- predict(semi_mod2, newdata=data.frame(
+                       lcholest=x_vec
+                       , smoker=rep('1', ele_num)
+                        )
+                      )
+
+fHat_nosmoke <- predict(semi_mod2, newdata=data.frame(
+                       lcholest=x_vec
+                       , smoker=rep('0', ele_num)
+                        )
+                      )
+```
+
+```{r}
+plot(fram2$lcholest, fram2$lsbp, type='n'
+     , xlab="Cholesterol"
+     , ylab="Blood Pressure"
+     , main="Cholesterol by Blood Pressure"
+     )
+mtext("Semi-parametric ANCOVA with Interaction")
+
+col_vec <- c("dodgerblue", "forestgreen")
+lines(x_vec, fHat_smoke, col=col_vec[1], lwd=2.5, lty=2)
+lines(x_vec, fHat_nosmoke, col=col_vec[2], lwd=2.5, lty=3)
+
+legend(4.8, 5.2, c("Smoke", "NoSmoke")
+       , col=col_vec
+       , lwd=rep(2.5, 2)
+       , lty=c(2,3)
+      )
+``` 
+
+
+# Question 10
+What does the interaction mean in the case when the factors are binary?
+
+When we have a binary factor for our ANCOVA model, this indicates that the interaction term's coefficient is reflecting what happens to our outcome variable for that factor's non-reference class only.  
+
+# Question 11
+Run an analysis of whether our two regression lines are significantly different.
+
+```{r}
+# First, fit the null model
+contrast_mod1 <- mgcv::gam(lsbp ~ s(lcholest), data=fram2)
+
+# indicator of the smoke varible taking positive class
+smoke_ind <- as.numeric(fram2$smoker==1)
+# now, fit the alternative model
+contrast_mod2 <- mgcv::gam(lsbp ~ s(lcholest, smoke_ind), data=fram2)
+
+anova(contrast_mod1, contrast_mod2, test="F")
+
+
+```
+
+It appears that there is a significant difference between the two fits, for smoker and non-smoker.
+
+# Question 12
+Run native code using lme to fit LSBP vs. age
+
+```{r}
+#mixed_mod <- nlme::lme(fixed=lsbp ~ age, data=fram2)
+```
+
+
+
+```{r}
+#summary(fram2)
 ```
 
 
