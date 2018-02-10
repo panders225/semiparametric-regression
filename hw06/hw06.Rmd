@@ -16,7 +16,7 @@ Read in our data
 ```{r}
 fram <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/hw06/framington.csv")
 names(fram) <- tolower(names(fram))
-names(fram)
+dim(fram)
 
 ```
 
@@ -29,7 +29,7 @@ fram$lsbp <- log(((fram$sbp21 + fram$sbp22 + fram$sbp31 + fram$sbp32) / 4) - 50)
 fram$lcholest <- log((fram$cholest2 + fram$cholest3) / 2)
 ``` 
 
-Keep only the variables that we will be working with directly.
+Keep only the variables that we will be working with directly and make sure everything seems reasonable.
 
 ```{r}
 fram2 <- fram %>%
@@ -59,7 +59,7 @@ WebMD indicates that individuals who smoke tend to have higher blood pressure th
 The model produces the expectation of LSBP given smoking status _conditional on_ cholesterol.
 
 # Question 4
-Recreate the same model as in Question 1, but add in an interaction.
+Recreate the same model as in Question 1, but add in an interaction amongst the independent variables.
 
 ```{r}
 lin_mod2 <- lm(lsbp ~ smoker + lcholest + smoker:lcholest
@@ -69,12 +69,13 @@ lin_mod2 <- lm(lsbp ~ smoker + lcholest + smoker:lcholest
 summary(lin_mod2)
 ```
 
+The smoking indicator is still negatively associated with our blood pressure variable, but is no longer significant in the presence of the interaction term.
+
 # Question 5
 Run a semiparametric ANCOVA with mgcv, the semiparametric version of an ANCOVA without an interaction.
 
 ```{r}
-# making the smoker variable a factor, and ensuring that the reference level is 0
-semi_mod <- mgcv::gam(lsbp ~ relevel(factor(smoker), ref='0') + 
+semi_mod <- mgcv::gam(lsbp ~ factor(smoker) +
                         s(lcholest, k=23, bs="cr")
                       , data=fram2
                       , method="REML"
@@ -86,6 +87,67 @@ summary(semi_mod)
 For the data in part 5, display a plot of the two lines, but without the data
 
 ```{r} 
-plot(semi_mod)
+# first, generate the data required for plotting
+
+x_var <- seq(from=min(fram2$lcholest)
+             , to=max(fram2$lcholest)
+             , len=1000
+             )
+f_hat_smoker <- predict(semi_mod
+                        , newdata=data.frame(
+                         smoker=rep('0', 1000)
+                         , lcholest=x_var
+                        )
+                        )
+
+
+f_hat_nosmoke <- predict(semi_mod
+                         , newdata=data.frame(
+                            smoker=rep('1', 1000)
+                            , lcholest=x_var
+                           ) 
+                         )
 ```
+
+
+```{r}
+plot(fram2$lcholest, fram2$lsbp, type="n"
+     , xlab="Cholesterol Variable"
+     , ylab = "Blood Pressure Variable"
+     , main="Blood Presure by Cholesterol ANCOVA comparison"
+       )
+
+lines(x_var, f_hat_smoker, lty=2, lwd=2.5)
+lines(x_var, f_hat_nosmoke, lty=3, lwd=2.5)
+
+legend(4.8, 5
+       , c("Smoker", "NonSmoker")
+       , lty=c(2,3))
+```
+
+
+```{r}
+
+```
+
+
+
+# Question 7
+Skipping for now
+
+# Question 8
+Run the semiparametric version of ANCOVA but with an interaction.  
+
+```{r}
+semi_mod2 <- mgcv::gam(lsbp ~ factor(smoker)*lcholest +
+                        s(lcholest, k=23, bs="cr")
+                      , data=fram2
+                      , method="REML"
+                     )
+summary(semi_mod2)
+
+```
+
+
+
 
