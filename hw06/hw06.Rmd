@@ -192,23 +192,24 @@ summary(semi_mod2)
 
 ```
 
-From the above results, it does not appear that there is any sort of interaction present, as the p-value on the interaction term between  _smoker_ and _lcholest_ is not significant.
+From the above results, it does not appear that there is any sort of interaction present between _smoker_ and _lcholest_.  The estimate for this term is negligibly small, and the p-value is very large, indicating a lack of significance. 
+
 
 # Question 9
 Display the fits of the above regressions, but without the data points.
 
 ```{r}
-ele_num <- 1000
-x_vec <- seq(from=min(fram2$lcholest), to=max(fram2$lcholest), len=ele_num)
+ng <- 1000
+x_vec <- seq(from=min(fram2$lcholest), to=max(fram2$lcholest), len=ng)
 fHat_smoke <- predict(semi_mod2, newdata=data.frame(
                        lcholest=x_vec
-                       , smoker=rep('1', ele_num)
+                       , smoker=rep('1', ng)
                         )
                       )
 
 fHat_nosmoke <- predict(semi_mod2, newdata=data.frame(
                        lcholest=x_vec
-                       , smoker=rep('0', ele_num)
+                       , smoker=rep('0', ng)
                         )
                       )
 ```
@@ -236,13 +237,13 @@ legend(4.8, 5.2, c("Smoke", "NoSmoke")
 # Question 10
 What does the interaction mean in the case when the factors are binary?
 
-When we have a binary factor for our ANCOVA model, this indicates that the interaction term's coefficient is reflecting what happens to our outcome variable for that factor's non-reference class only.  
+When we have a binary factor for our ANCOVA model, this indicates that the interaction term's coefficient is reflecting what happens to our outcome variable for that factor's non-reference class only.  In this case, we are seeing the results of _smoker_==1 interacting with _lcholest_.
 
 # Question 11
 Run an analysis of whether our two regression lines are significantly different.
 
 ```{r}
-# First, fit the null model
+# First, fit the null model - this is run on both the smokers and non-smokers
 contrast_mod1 <- mgcv::gam(lsbp ~ s(lcholest), data=fram2)
 
 # indicator of the smoke varible taking positive class
@@ -250,6 +251,7 @@ smoke_ind <- as.numeric(fram2$smoker==1)
 # now, fit the alternative model
 contrast_mod2 <- mgcv::gam(lsbp ~ s(lcholest, smoke_ind), data=fram2)
 
+# run the final test
 anova(contrast_mod1, contrast_mod2, test="F")
 
 
@@ -258,18 +260,24 @@ anova(contrast_mod1, contrast_mod2, test="F")
 It appears that there is a significant difference between the two fits, for smoker and non-smoker.
 
 # Question 12
-Run native code using lme to fit LSBP vs. age.  
+Ignore the smokers, and run native code using lme to fit LSBP vs. age.  
 
 ```{r}
-x <- fram2$lcholest
-y <- fram2$lsbp
+fram_ns <- fram2[which(fram2$smoker==0), ]
+x <- fram_ns$age
+y <- fram_ns$lsbp
+
 numIntKnots <- 23
 intKnots <- quantile(unique(x), seq(0, 1, length=numIntKnots+2))[-c(1, numIntKnots+2)]
+
 a <- 1.01 * min(x) - 0.01*max(x)
 b <- 1.01 * max(x) - 0.01*min(x)
 Z <- HRW::ZOSull(x, range.x=c(a, b), intKnots=intKnots)
+
 dummyID <- factor(rep(1, length(x)))
-mm_fit <- nlme::lme(y ~ x, random=list(dummyID=pdIdent(~ -1+Z)))
+
+# prep is finally over - run the model
+mm_fit <- nlme::lme(y ~ x, random=list(dummyID=pdIdent(~ -1 + Z)))
 
 ```
 
@@ -277,28 +285,44 @@ mm_fit <- nlme::lme(y ~ x, random=list(dummyID=pdIdent(~ -1+Z)))
 Display the fit without data points.  Also provide a confidence band.
 
 ```{r}
-# extract our model coefficient
+# extract our model coefficients
 betaHat <- mm_fit$coefficients$fixed
 uHat <- unlist(mm_fit$coefficients$random)
+# create plotting parameters
 ng <- 1001
 xg <- seq(a, b, length.out=ng)
 Xg <- cbind(rep(1, ng), xg)
 Zg <- HRW::ZOSull(xg, range.x=c(a,b), intKnots=intKnots)
 fHatg <- as.vector(Xg %*% betaHat + Zg %*% uHat)
 plot(x, y, type='n'
-     , xlab="Cholesterol"
+     , xlab="Age"
      , ylab="Blood Pressure"
-     , main='Blood Pressure by Cholesterol Mixed Model Fit'
+     , main='Blood Pressure by Age Mixed Model Fit'
      )
-
+# plot the main line
 lines(xg, fHatg, col="darkgreen", lwd=2.5)
 
+# grab the standard error estimates
+se_pred <- diag(Xg %*% mm_fit$varFix %*% t(Xg))
+SE <- sqrt(se_pred)
+# lower and upper bounds
+upper <- fHatg + (1.96 * se_pred)
+lower <- fHatg - (1.96 * se_pred)
+# plot the confidence polygons
+polygon(x=c(xg,rev(xg))
+      , y=c(upper
+      , rev(lower))
+      , col="gray"
+      , border=NA
+      , density=75
+      )
 
-# consider inclusion of se.fit=T option
 ```
 
+Pointwise 95% confidence interval is there, but very narrow and difficult to see.
+
 # Question 14
-Is the fit of our model statistically significant?
+Is the fit of our mixed model statistically significant?
 
 ```{r}
 anova(mm_fit)
