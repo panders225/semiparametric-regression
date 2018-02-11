@@ -130,15 +130,28 @@ legend(4.8, 5
        )
 ```
 
+# Question 7
+Skipping for now
 
 ```{r}
+# form confidence intervals for the regression lines
+conf_int_smoke <- predict(semi_mod, newdata=data.frame(
+                        smoker=rep('1', 1000) 
+                        , lcholest=x_var
+                          )
+                        , interval="confidence"
+                        , level=0.95
+                    )
+
 
 ```
 
-
-
-# Question 7
-Skipping for now
+```{r}
+# the key is the polygon command in hw02
+#https://stackoverflow.com/questions/14069629/plotting-confidence-intervals
+glimpse(conf_int_smoke)
+conf_int_smoke
+```
 
 # Question 8
 Run the semiparametric version of ANCOVA but with an interaction.  
