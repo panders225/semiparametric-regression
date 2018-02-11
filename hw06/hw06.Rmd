@@ -17,6 +17,7 @@ Read in our data
 ```{r}
 fram <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/hw06/framington.csv")
 names(fram) <- tolower(names(fram))
+# check that we have 1615 observations
 dim(fram)
 
 ```
@@ -30,6 +31,12 @@ fram$lsbp <- log(((fram$sbp21 + fram$sbp22 + fram$sbp31 + fram$sbp32) / 4) - 50)
 fram$lcholest <- log((fram$cholest2 + fram$cholest3) / 2)
 ``` 
 
+Im guessing that we conducted the transformations to take the variables to normality.  Checking that here.
+```{r}
+plot(density(fram$lsbp), main="Blood Pressure Density Plot")
+plot(density(fram$lcholest), main="Cholesterol Density Plot")
+```
+
 Keep only the variables that we will be working with directly and make sure everything seems reasonable.
 
 ```{r}
@@ -38,8 +45,9 @@ fram2 <- fram %>%
 head(fram2)
 ```
 
+
 # Question 1
-Fit a multiple linear regression of LSBP on lcholest and smoker via "lm" function.  Produce a estimates, standard errors, and p-values.
+Fit a multiple linear regression of LSBP on lcholest and smoker via "lm" function.  Produce estimates, standard errors, and p-values.
 
 ```{r}
 # fit model
@@ -52,15 +60,15 @@ summary(lin_mod)
 
 
 # Question 2
-Conduct web research on whether smokers have higher or lower blood pressure on average compared to non-smokers.
+Conduct web research on whether smokers have higher or lower blood pressure on average compared with non-smokers.
 
-WebMD indicates that individuals who smoke tend to have higher blood pressure than those who do not.  This is not consistent with my findings from Question 1, which indicate that participants who smoke have lower blood pressure than those who do not, conditional on our transformed cholesterol variable.  There is nothing in the documentation to indicate that smoker is not encoded with '1' as the positive class.  This is suspicious, and suggests that we need to check our data or revisit our model specification. 
+WebMD indicates that individuals who smoke tend to have higher blood pressure than those who do not.  This is not consistent with my findings from Question 1, which indicate that participants who smoke have lower blood pressure than those who do not, conditional on our transformed cholesterol variable.  There is nothing in the documentation to indicate that smoker is not encoded with '1' as the positive class.  This result is suspicious, and suggests that we need to check our data or revisit our model specification. 
 
 # Question 3
 The model produces the expectation of LSBP given smoking status _conditional on_ cholesterol.
 
 # Question 4
-Recreate the same model as in Question 1, but add in an interaction amongst the independent variables.
+Recreate the same model as in Question 1, but also include an interaction amongst the independent variables.
 
 ```{r}
 lin_mod2 <- lm(lsbp ~ smoker + lcholest + smoker:lcholest
@@ -89,38 +97,41 @@ For the data in part 5, display a plot of the two lines, but without the data
 
 ```{r} 
 # first, generate the data required for plotting
-
+ng <- 1000
+# x var
 x_var <- seq(from=min(fram2$lcholest)
              , to=max(fram2$lcholest)
-             , len=1000
+             , len=ng
              )
+# y prediction variables
 f_hat_smoker <- predict(semi_mod
                         , newdata=data.frame(
-                         smoker=rep('0', 1000)
+                         smoker=rep('1', ng)
                          , lcholest=x_var
                         )
+                        , se.fit=TRUE
                         )
 
 f_hat_nosmoke <- predict(semi_mod
                          , newdata=data.frame(
-                            smoker=rep('1', 1000)
+                            smoker=rep('0', ng)
                             , lcholest=x_var
                            ) 
+                         , se.fit=TRUE
                          )
 ```
 
-
 ```{r}
-lineColors <- c("red", "dodgerblue")
+lineColors <- c("darkolivegreen", "dodgerblue")
 
 plot(fram2$lcholest, fram2$lsbp, type="n"
-     , xlab="Cholesterol Variable"
-     , ylab = "Blood Pressure Variable"
+     , xlab="Cholesterol Metric"
+     , ylab = "Blood Pressure Metric"
      , main="Blood Presure by Cholesterol ANCOVA comparison"
        )
 
-lines(x_var, f_hat_smoker, lty=2, lwd=2.5, col=lineColors[1])
-lines(x_var, f_hat_nosmoke, lty=3, lwd=2.5, col=lineColors[2])
+lines(x_var, f_hat_smoker$fit, lty=2, lwd=2.5, col=lineColors[1])
+lines(x_var, f_hat_nosmoke$fit, lty=3, lwd=2.5, col=lineColors[2])
 
 legend(4.8, 5
        , c("Smoker", "NonSmoker")
@@ -131,27 +142,42 @@ legend(4.8, 5
 ```
 
 # Question 7
-Skipping for now
+Display a plot of the two lines, but split into two separate graphics, and with pointwise 95% confidence intervals.
 
 ```{r}
-# form confidence intervals for the regression lines
-conf_int_smoke <- predict(semi_mod, newdata=data.frame(
-                        smoker=rep('1', 1000) 
-                        , lcholest=x_var
-                          )
-                        , interval="confidence"
-                        , level=0.95
-                    )
+plot_with_bands <- function(mod_pred, range_var, color_vec, color_idx, lty, title="NULL") {
+  # create a regression fit with 95% pointwise confidence intervals for the line
+  upper <- mod_pred$fit + (1.96 * mod_pred$se.fit)
+  lower <- mod_pred$fit - (1.96 * mod_pred$se.fit)
+  fit <- mod_pred$fit
+  
+  plot(fram2$lcholest, fram2$lsbp, type="n"
+       , xlab="Cholesterol Metric"
+       , ylab = "Blood Pressure Metric"
+       , main=title
+         )
 
+  lines(range_var, fit, lty=2, lwd=2.5, col=color_vec[color_idx])
+
+  polygon(x=c(range_var,rev(range_var))
+        , y=c(upper
+        , rev(lower))
+        , col="gray"
+        , border=NA
+        , density=75
+        )
+
+                  }
+# execute the function 
+par(mfrow=c(1,2))
+plot_with_bands(mod_pred=f_hat_smoker, range_var=x_var, color_vec=lineColors, color_idx=1, lty=2
+                , title="Smoker")
+plot_with_bands(mod_pred=f_hat_nosmoke, range_var=x_var, color_vec=lineColors, color_idx=2, lty=3
+                , title="Non-Smoker")
+par(mfrow=c(1,1)) # reset
 
 ```
 
-```{r}
-# the key is the polygon command in hw02
-#https://stackoverflow.com/questions/14069629/plotting-confidence-intervals
-glimpse(conf_int_smoke)
-conf_int_smoke
-```
 
 # Question 8
 Run the semiparametric version of ANCOVA but with an interaction.  
@@ -268,6 +294,7 @@ plot(x, y, type='n'
 lines(xg, fHatg, col="darkgreen", lwd=2.5)
 
 
+# consider inclusion of se.fit=T option
 ```
 
 # Question 14
