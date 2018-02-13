@@ -334,11 +334,11 @@ The F-test indicates that the fit of our model is significant.
 Test whether the fit is linear or quadratic vs. the need to do a semiparametric fit.
 
 ```{r}
-
-mm_fit2 <- nlme::lme(y ~ x + x**2, random=list(dummyID=pdIdent(~ -1+Z)))
-summary(mm_fit2)
+mm_fit <- nlme::lme(y ~ x, random=list(dummyID=pdIdent(~ -1 + Z)))
+mm_fit2 <- nlme::lme(y ~ x**2, random=list(dummyID=pdIdent(~ -1+Z)))
+anova(mm_fit, mm_fit2)
 ```
 
 
-
+# It does not appear that the quadratic fit is improving our model in any appreciable way.
 
