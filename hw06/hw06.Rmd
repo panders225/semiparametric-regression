@@ -31,12 +31,6 @@ fram$lsbp <- log(((fram$sbp21 + fram$sbp22 + fram$sbp31 + fram$sbp32) / 4) - 50)
 fram$lcholest <- log((fram$cholest2 + fram$cholest3) / 2)
 ``` 
 
-Im guessing that we conducted the transformations to take the variables to normality.  Checking that here.
-```{r}
-plot(density(fram$lsbp), main="Blood Pressure Density Plot")
-plot(density(fram$lcholest), main="Cholesterol Density Plot")
-```
-
 Keep only the variables that we will be working with directly and make sure everything seems reasonable.
 
 ```{r}
@@ -44,7 +38,6 @@ fram2 <- fram %>%
   dplyr::select(chd, age, smoker, lsbp, lcholest)
 head(fram2)
 ```
-
 
 # Question 1
 Fit a multiple linear regression of LSBP on lcholest and smoker via "lm" function.  Produce estimates, standard errors, and p-values.
@@ -192,8 +185,7 @@ summary(semi_mod2)
 
 ```
 
-From the above results, it does not appear that there is any sort of interaction present between _smoker_ and _lcholest_.  The estimate for this term is negligibly small, and the p-value is very large, indicating a lack of significance. 
-
+From the above results, it does appear that there is an interaction present between _smoker_ and _lcholest_.  While the p-value for the interaction term itself is not anywhere close to indicating significance, the coefficient for the _smoker_ factor is no longer significant, which was more in line with my prior expectations.
 
 # Question 9
 Display the fits of the above regressions, but without the data points.
@@ -237,7 +229,7 @@ legend(4.8, 5.2, c("Smoke", "NoSmoke")
 # Question 10
 What does the interaction mean in the case when the factors are binary?
 
-When we have a binary factor for our ANCOVA model, this indicates that the interaction term's coefficient is reflecting what happens to our outcome variable for that factor's non-reference class only.  In this case, we are seeing the results of _smoker_==1 interacting with _lcholest_.
+When we have a binary factor for our ANCOVA model, this indicates that the interaction term's coefficient is reflecting what happens to our outcome variable for that factor's non-reference class only.  In this case, we are seeing the results of _smoker_=1 interacting with _lcholest_.
 
 # Question 11
 Run an analysis of whether our two regression lines are significantly different.
@@ -335,10 +327,10 @@ Test whether the fit is linear or quadratic vs. the need to do a semiparametric 
 
 ```{r}
 mm_fit <- nlme::lme(y ~ x, random=list(dummyID=pdIdent(~ -1 + Z)))
-mm_fit2 <- nlme::lme(y ~ x**2, random=list(dummyID=pdIdent(~ -1+Z)))
-anova(mm_fit, mm_fit2)
+lin_fit <- lm(y ~ x)
+quad_fit <- lm(y ~ x + x**2)
+# conduct main test
+anova(mm_fit, lin_fit, quad_fit)
 ```
 
-
-# It does not appear that the quadratic fit is improving our model in any appreciable way.
-
+It does not appear that there is any statistical difference between the linear fit, quadratic fit, or the mixed_model semiparametric fit.
