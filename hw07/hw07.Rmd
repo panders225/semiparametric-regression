@@ -1,0 +1,156 @@
+---
+title: "Assignment-07"
+author: "Philip Anderson"
+date: "2/22/2018"
+output: pdf_document
+---
+
+```{r setup, message=FALSE}
+library("mgcv")
+```
+
+```{r}
+# read it in
+fram <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/framingham_with_lsbp_and_lcholest.csv")
+names(fram) <- tolower(names(fram))
+str(fram)
+```
+
+Our response variable Y, equals chd; our predictors are lsbp, lcholest, age, and smoking status.  
+
+# Question 1
+Fit a logistic gam with only LSBP modeled within a spline function.
+
+```{r}
+logit1 <- mgcv::gam(chd ~ s(lsbp, k=23, bs="cr") + lcholest + age + smoker
+                    , family=binomial(link="logit")
+                    , data=fram
+                    )
+summary(logit1)
+```
+
+P-values for 4 predictors are as follows:
+
+```{r}
+pval_smry <- function(gam_mod) {
+  gam_smry <- summary(gam_mod)
+  print("Linear Term p-values:")
+  print(gam_smry$pTerms.pv)
+  cat("\nSmoothed Term p-values:\n")
+  cat(gam_smry$s.pv)
+  
+}
+
+pval_smry(logit1)
+```
+
+From the p-value on the smoothed term, it appears that lsbp should be modeled as a spline.
+
+# Question 2
+Fit a logisitc gam with only lcholest modeled as a spline.
+
+```{r}
+logit2 <- mgcv::gam(chd ~ lsbp + s(lcholest, k=23, bs="cr") + age + smoker
+                    , family=binomial(link="logit")
+                    , data=fram
+                    )
+summary(logit2)
+
+```
+
+```{r}
+pval_smry(logit2)
+```
+
+It looks as though the _lcholest_ variable should be modeled within a spline function.
+
+# Question 3
+Fit a logistic gam with only age modeled as a spline.
+
+```{r}
+logit3 <- mgcv::gam(chd ~ lsbp + lcholest + s(age, k=23, bs="cr") + smoker
+                    , family=binomial(link="logit")
+                    , data=fram
+                    )
+summary(logit3)
+``` 
+
+```{r}
+pval_smry(logit3)
+```
+
+It appears as though the age term should be smoothed as well.
+
+# Question 4
+Fit the model with all continuous terms modeled as splines.
+
+```{r}
+logit4 <- mgcv::gam(chd ~ s(lsbp, k=23, bs="cr") + 
+                      s(lcholest, k=23, bs="cr") + 
+                      s(age, k=23, bs="cr") + smoker
+                    , family=binomial(link="logit")
+                    , data=fram
+                    )
+summary(logit4)
+
+```
+
+```{r}
+pval_smry(logit4)
+```
+
+# Question 5
+Refit the model from Question 4, with only the terms that you picked as being significant under spline transformation.
+
+```{r}
+logit_alt <- mgcv::gam(chd ~ lsbp + lcholest + s(age) + smoker
+                       , family=binomial(link="logit")
+                       , data=fram
+                      )
+```
+
+
+
+```{r}
+# specify the null model
+logit_null <- mgcv::gam(chd ~ lsbp + lcholest + age + smoker
+                        , family=binomial(link="logit")
+                        , data=fram
+                      )
+```
+
+
+```{r}
+anova(logit_alt, logit_null, test="Chisq")
+```
+
+The moel that contains the smoothed terms is not significantly different from the model that doesn't.
+
+```{r}
+
+print_em <- function(mod_title="Model 1", mod_obj) {
+
+  print(mod_title)
+  mod_smry <- summary(mod_obj)
+  print("Smoke impact odds ratio:")
+  print(mod_smry$p.coeff[3 + 1])
+  print("Smoke p-value:")
+  print(mod_smry$pTerms.pv[3])
+  cat("\n--- --- --- --- --- \n\n")
+}
+
+print_em(mod_title="Model 1", mod_obj=logit1)
+print_em(mod_title="Model 2", mod_obj=logit2)
+print_em(mod_title="Model 3", mod_obj=logit3)
+print_em(mod_title="Model 4", mod_obj=logit4)
+
+
+```
+
+
+
+
+
+
+
+
