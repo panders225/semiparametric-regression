@@ -39,7 +39,7 @@ fitInt = gam(deny ~ black + s(dir,by = factor(pbcr),k = 27)
                    + pbcr + self + single + s(ccs,k = 4), 
                      family = binomial(link='logit'), 
                     data = BostonMortgages)
-
+summary(fitInt)
 ##########################################################
 # Set up grids for customised plots of smooth fits:
 # 

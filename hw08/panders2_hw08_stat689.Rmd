@@ -1,0 +1,219 @@
+---
+title: "Assignment 08 - STAT 689"
+author: "Philip Anderson; panders2@tamu.edu"
+date: "2/26/2018"
+output: pdf_document
+---
+
+```{r setup, message=FALSE}
+library("mgcv")
+```
+
+# Part 1
+
+```{r}
+# read in the modified salinity dataset 
+salinity <- read.csv('/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/salinity_modified_lev_points.csv')
+names(salinity) <- tolower(names(salinity))
+str(salinity)
+```
+
+# Question 1
+Fit a GAM where salinity is regressed on a smooth function of discharge.  Plot discharge against the absolute residuals from this fit.
+
+```{r}
+gam_mod <- mgcv::gam(salinity ~ s(discharge)
+                   , data=salinity
+                   )
+abs_resid <- abs(gam_mod$residuals)
+plot(salinity$discharge, abs_resid
+     , main="Discharge by Abs(Residual) from fitted GAM" 
+     , xlab="Discharge"
+     , ylab="Absolute Residuals"
+     )
+
+```
+
+Note that we appear to have a positive trend.  This reflects evidence of hetereoscedacticity.
+
+# Question 2
+Calculate the ratio of the maximum predicted absolute residual to the minimum predicted absolute residual.
+
+```{r}
+cat("\nMaximum Value: ", max(abs_resid))
+cat("\nMinimum Value: ", min(abs_resid))
+cat("\nRatio of max to min: ", max(abs_resid) / min(abs_resid))
+```
+
+# Question 3
+The ratio found in Question 2 is quite high (definitely higher than our heuristic of 3), indicating that we have evidence of heteroscedacticity.  This will make the calculation of pointwise confidence intervals more involved, and render naive estimates incorrect.
+
+# Question 4
+Conduct a weighted fit of the data.  Plot discharge against the absolute residuals of the new model divided by the estimated standard deviations.
+
+```{r}
+gam_mod_resid <- mgcv::gam(abs_resid ~ s(salinity$discharge))
+weight <- 1/(fitted(gam_mod_resid)^2)
+gam_mod_weight <- mgcv::gam(salinity ~ s(discharge)
+                            , data=salinity
+                            , weight=weight
+                            )
+```
+
+```{r}
+plot(salinity$discharge, gam_mod_weight$residuals/fitted(gam_mod_resid)
+     , main="Discharge against Standardized Absolute Residuals (Weighted Fit)"
+     , xlab="Discharge"
+     , ylab="Standardized Abs(Residuals)"
+     )
+```
+
+
+# Question 5
+Compute the 95% confidence intervals for the unweighted and weighted fits.
+
+```{r}
+x_var <- seq(from=min(salinity$discharge), to=max(salinity$discharge)
+             , len=1000)
+# predictions
+unweight_pred <- predict(gam_mod
+                         , newdata=data.frame(discharge=x_var)
+                         , se.fit=TRUE)
+
+weight_pred <- predict(gam_mod_weight
+                         , newdata=data.frame(discharge=x_var)
+                         , se.fit=TRUE)
+
+# confidence bounds
+unweight_lower <- unweight_pred$fit - (1.96 * unweight_pred$se.fit)
+unweight_upper <- unweight_pred$fit + (1.96 * unweight_pred$se.fit)
+
+weight_lower <- weight_pred$fit - (1.96 * weight_pred$se.fit)
+weight_upper <- weight_pred$fit + (1.96 * weight_pred$se.fit)
+```
+
+```{r}
+plot(salinity$discharge, salinity$salinity, type="n"
+     , main="Salinity by Discharge"
+     , xlab="Discharge"
+     , ylab="Salinity"
+     )
+
+gam_plotter <- function(pred_obj, lower_bnd, upper_bnd, shader) {
+  lines(x_var, pred_obj$fit, lwd=2.5)
+  polygon(x=c(x_var, rev(x_var))
+          , y=c(upper_bnd, rev(lower_bnd))
+          , col=shader
+          , border=NA
+          , density=50
+          )
+}
+
+# unweighted GAM first
+gam_plotter(pred_obj=unweight_pred
+            , lower_bnd=unweight_lower
+            , upper_bnd=unweight_upper
+            , shader="palegreen"
+            )
+rug(salinity$discharge, lwd=3, col="olivedrab")
+
+# weighted GAM second
+gam_plotter(pred_obj=weight_pred
+            , lower_bnd=weight_lower
+            , upper_bnd=weight_upper
+            , shader="cornflowerblue"
+            )
+legend("topright"
+       , c("Unweighted", "Weighted")
+       , lty=c(1,1)
+       , lwd=c(5,5)
+       , col=c("palegreen", "cornflowerblue")
+       )
+
+```
+
+I also found it helpful to see two side-by-side plots, due to the overlapping confidence bands in the above image.
+
+```{r}
+par(mfrow=c(1,2))
+
+plot(salinity$discharge, salinity$salinity, type="n"
+     , main="Unweighted Model"
+     , xlab="Discharge"
+     , ylab="Salinity"
+     )
+
+# unweighted GAM first
+gam_plotter(pred_obj=unweight_pred
+            , lower_bnd=unweight_lower
+            , upper_bnd=unweight_upper
+            , shader="palegreen"
+            )
+rug(salinity$discharge, lwd=3, col="olivedrab")
+
+plot(salinity$discharge, salinity$salinity, type="n"
+     , main="Weighted Model"
+     , xlab="Discharge"
+     , ylab="Salinity"
+     )
+
+# weighted GAM second
+gam_plotter(pred_obj=weight_pred
+            , lower_bnd=weight_lower
+            , upper_bnd=weight_upper
+            , shader="cornflowerblue"
+            )
+rug(salinity$discharge, lwd=3, col="dodgerblue")
+```
+
+# Question 6
+Are there any systematic differences in the two plots?
+
+It appears that the weighted fit has generally narrower confidence bands in the regions of x where we have more observations.  In the regions where we do not have as many observations (x>25), it appears that the confidence bands are wider.
+
+# Part 2
+# Question 7
+For the Framingham data, fit a factor-by-curve GAM where CHD is regressed on LSBP, LCholest, and age (all splines), but allow an interaction between s(age) and smoker.  
+
+```{r}
+# first, read in the data
+fram <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/framingham_with_lsbp_and_lcholest.csv")
+names(fram) <- tolower(names(fram))
+str(fram)
+```
+
+```{r}
+fram_mod <- mgcv::gam(chd ~ s(lsbp, bs="cr", k=23) + s(lcholest, bs="cr", k=23)
+                       + s(age, by=factor(smoker))
+                      , family=binomial(link="logit")
+                      , data=fram
+                      )
+summary(fram_mod)
+```
+
+Plot the fitted splines to age for smokers and non-smokers.
+
+```{r}
+par(mfrow=c(1,2))
+plot.gam(fram_mod, shade = TRUE, shade.col="palegreen", select=3
+         , trans=plogis
+         , ylab="Pr(CHD)"
+         , main="Smoker=0 by Age interaction")
+plot.gam(fram_mod, shade = TRUE, shade.col="palegreen", select=4
+         , trans=plogis
+         , ylab="Pr(CHD)"
+         , main="Smoker=1 by Age Interaction"
+         )
+par(mfrow=c(1,1))
+```
+
+# Question 8
+In Question 7, do you think there is any statistical evidence that the risk of developing CHD over 8 years depends on whether or not you are a smoker?
+
+For non-smokers, the partial dependence plot shows that the probability of CHD increases linearly, but for smokers, the max probability is achieved earlier.  
+
+```{r}
+fram_mod$coefficients
+```
+
+
