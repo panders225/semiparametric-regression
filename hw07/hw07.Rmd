@@ -204,3 +204,37 @@ There is not a dramatic difference between the models fit in Questions 1-5.  Thi
 
 
 # Question 9
+For the model in Question 4 (all continuous terms modeled as splines), find a 95% confidence interval for the odds ratio on the smoker variable.
+
+```{r}
+logit4_smry <- summary(logit4)
+beta_smok <- logit4_smry$p.coeff['smoker']
+se_beta_smok <- logit4_smry$se['smoker']
+
+lower <- exp(beta_smok - 1.96*se_beta_smok)
+upper <- exp(beta_smok + 1.96*se_beta_smok)
+
+cat("Odds ratio given by : ",beta_smok, "\n")
+cat("Odds ratio 95% confidence interval given by: ", lower, upper, "\n")
+```
+
+The confidence interval just barely misses a value of 1.
+
+# Question 10
+For the model in Question 5, pick any one of the variables modeled as a spline; state the odds ratio for the highest level of that variable to the lowest level.
+
+I will conduct the analysis on the LSBP variable.  From the fit object generated in Question 5, we can grab the max and min values of the spline coefficient.  These will represent the log odds ratio of the highest and lowest values of the smoothed lsbp term.  We can then exponentiate them and take their ratio to determine the difference in odds ratio of pr(CHD) for the highest to lowest level of smoothed(LSBP).
+
+```{r}
+lsbp_low <- logit5$coefficients['s(lsbp).1']
+lsbp_high <- logit5$coefficients['s(lsbp).22']
+
+or <- (exp(lsbp_high) / exp(lsbp_low))
+
+print("Our odds ratio of interest is: ")
+print(or)
+```
+
+
+# Question 11
+From the analysis conducted, it appears that the probability of having a CHD is positively associated with blood pressure, cholesterol levels, age, and smoking status.  The relationship between the continuous variables (blood pressure, cholesterol, age) and the CHD probability is linear, which means that if we increase any of these by a single unit, we will increase our CHD probability by a set amount, regardless of if we have high or low values of these inputs.  For clarification, if I am age 40, and move to age 41, I will see the same probability increase in CHD, as if I were 60 and moving to age 61, in the presence of other variables.
