@@ -183,7 +183,8 @@ str(fram)
 ```
 
 ```{r}
-fram_mod <- mgcv::gam(chd ~ s(lsbp, bs="cr", k=23) + s(lcholest, bs="cr", k=23)
+fram_mod <- mgcv::gam(chd ~ s(lsbp, bs="cr", k=23) 
+                       + s(lcholest, bs="cr", k=23)
                        + s(age, by=factor(smoker))
                       , family=binomial(link="logit")
                       , data=fram
@@ -205,6 +206,106 @@ plot.gam(fram_mod, shade = TRUE, shade.col="palegreen", select=4
          , main="Smoker=1 by Age Interaction"
          )
 par(mfrow=c(1,1))
+```
+
+```{r}
+plot(fram_mod, shade=TRUE, shade.col="palegreen")
+```
+
+
+```{r}
+summary(fram_mod)
+
+ng <- 1001
+
+lsbp_low <- min(fram$lsbp); lsbp_high <- max(fram$lsbp)
+lsbpg <- seq(lsbp_low, lsbp_high, length=ng)
+
+lcholest_low <- min(fram$lcholest); lcholest_high <- max(fram$lcholest)
+lcholestg <- seq(lcholest_low, lcholest_high, length=ng)
+
+age_low <- min(fram$age); age_high <- max(fram$age)
+ageg <- seq(age_low, age_high, length=ng)
+
+lsbp_avg <- rep(mean(fram$lsbp), ng)
+lcholest_avg <- rep(mean(fram$lcholest), ng)
+age_avg <- rep(mean(fram$age), ng)
+
+smoke_n <- as.factor(rep('0', ng))
+smoke_y <- as.factor(rep('1', ng))
+
+
+```
+
+
+
+```{r}
+# plot as a function of age
+fAgeSmoke <- predict(fram_mod, type="response"
+                     , newdata=data.frame(
+                      lsbp=lsbp_avg
+                      , lcholest=lcholest_avg
+                      , age=ageg
+                      , smoker=smoke_y
+                      )
+                     , se.fit=TRUE
+                     )
+
+fAgeNoSmoke <- predict(fram_mod, type="response"
+                     , newdata=data.frame(
+                      lsbp=lsbp_avg
+                      , lcholest=lcholest_avg
+                      , age=ageg
+                      , smoker=smoke_n
+                      )
+                     , se.fit=TRUE
+                     )
+```
+
+
+```{r}
+# SMOKER==1
+prob_age_smoke_g <- fAgeSmoke$fit
+sd_age_smoke_g <- fAgeSmoke$se.fit
+
+lwr_age_smoke <- prob_age_smoke_g - 2*sd_age_smoke_g
+upr_age_smoke <- prob_age_smoke_g + 2*sd_age_smoke_g
+# trim
+lwr_age_smoke[lwr_age_smoke<0] <- 0
+upr_age_smoke[upr_age_smoke>1] <- 1
+
+# SMOKER==0
+prob_age_nosmoke_g <- fAgeNoSmoke$fit
+sd_age_nosmoke_g <- fAgeNoSmoke$se.fit
+
+lwr_age_nosmoke <- prob_age_nosmoke_g - 2*sd_age_nosmoke_g
+upr_age_nosmoke <- prob_age_nosmoke_g + 2*sd_age_nosmoke_g
+# trim
+lwr_age_nosmoke[lwr_age_nosmoke<0] <- 0
+upr_age_nosmoke[upr_age_nosmoke>1] <- 1
+
+
+```
+
+```{r}
+plot(0, typ="n", xlim=range(ageg), ylim=c(0, 0.32), xlab="age", ylab="Pr(CHD)")
+rug(fram$age, col="black", quiet=TRUE)
+# smoker
+lines(ageg,prob_age_smoke_g, lwd=2.5, col="darkseagreen4")
+lines(ageg, lwr_age_smoke, lwd=2, lty=2, col="darkseagreen4")
+lines(ageg, upr_age_smoke, lwd=2, lty=2, col="darkseagreen4")
+# non-smoker
+lines(ageg,prob_age_nosmoke_g, lwd=2.5, col="darkorchid4")
+lines(ageg, lwr_age_nosmoke, lwd=2, lty=2, col="darkorchid4")
+lines(ageg, upr_age_nosmoke, lwd=2, lty=2, col="darkorchid4")
+
+legend("topleft"
+       , c("Smoker", "Non-Smoker")
+       , lty=c(1,1)
+       , lwd=c(2.5,2.5)
+       , col=c("darkseagreen4", "darkorchid4")
+       )
+
 ```
 
 # Question 8
