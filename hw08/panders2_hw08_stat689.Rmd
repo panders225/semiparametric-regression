@@ -189,33 +189,12 @@ fram_mod <- mgcv::gam(chd ~ s(lsbp, bs="cr", k=23)
                       , family=binomial(link="logit")
                       , data=fram
                       )
-summary(fram_mod)
-```
-
-Plot the fitted splines to age for smokers and non-smokers.
-
-```{r}
-par(mfrow=c(1,2))
-plot.gam(fram_mod, shade = TRUE, shade.col="palegreen", select=3
-         , trans=plogis
-         , ylab="Pr(CHD)"
-         , main="Smoker=0 by Age interaction")
-plot.gam(fram_mod, shade = TRUE, shade.col="palegreen", select=4
-         , trans=plogis
-         , ylab="Pr(CHD)"
-         , main="Smoker=1 by Age Interaction"
-         )
-par(mfrow=c(1,1))
-```
-
-```{r}
-plot(fram_mod, shade=TRUE, shade.col="palegreen")
 ```
 
 
-```{r}
-summary(fram_mod)
 
+
+```{r}
 ng <- 1001
 
 lsbp_low <- min(fram$lsbp); lsbp_high <- max(fram$lsbp)
@@ -288,7 +267,8 @@ upr_age_nosmoke[upr_age_nosmoke>1] <- 1
 ```
 
 ```{r}
-plot(0, typ="n", xlim=range(ageg), ylim=c(0, 0.32), xlab="age", ylab="Pr(CHD)")
+plot(0, typ="n", xlim=range(ageg), ylim=c(0, 0.32), xlab="age", ylab="Pr(CHD)"
+     , main="Smoker by Age | Factor by Curve Interaction")
 rug(fram$age, col="black", quiet=TRUE)
 # smoker
 lines(ageg,prob_age_smoke_g, lwd=2.5, col="darkseagreen4")
@@ -311,10 +291,23 @@ legend("topleft"
 # Question 8
 In Question 7, do you think there is any statistical evidence that the risk of developing CHD over 8 years depends on whether or not you are a smoker?
 
-For non-smokers, the partial dependence plot shows that the probability of CHD increases linearly, but for smokers, the max probability is achieved earlier.  
+Based on the confidence intervals in the above graphic, it does not appear that we have statistical evidence that the risk of developing CHD depends on whether you are a smoker.  In both cases, the trend is positive, but the lines overlap in several places, as the confidence bands.  See the Appendix for relevant partial dependence plots that lead to a similar conclusion.
+
+
+# Appendix
+
+Plot the fitted splines to age for smokers and non-smokers.
 
 ```{r}
-fram_mod$coefficients
+par(mfrow=c(1,2))
+plot.gam(fram_mod, shade = TRUE, shade.col="palegreen", select=3
+         , trans=plogis
+         , ylab="Pr(CHD)"
+         , main="Smoker=0 by Age interaction")
+plot.gam(fram_mod, shade = TRUE, shade.col="palegreen", select=4
+         , trans=plogis
+         , ylab="Pr(CHD)"
+         , main="Smoker=1 by Age Interaction"
+         )
+par(mfrow=c(1,1))
 ```
-
-
