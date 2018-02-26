@@ -13,7 +13,6 @@ library("mgcv")
 # read in our data set 
 fram <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/framingham_with_lsbp_and_lcholest.csv")
 names(fram) <- tolower(names(fram))
-str(fram)
 ```
 
 Our response variable Y, equals chd; our predictors are lsbp, lcholest, age, and smoking status.  
@@ -100,7 +99,10 @@ summary(logit4)
 pval_smry(logit4)
 ```
 
-From the above summaries, it appears that all of the spline terms we put into the fourth logistic regression are appropriate.  
+From the above summaries, it appears that all of the spline terms we put into the fourth logistic regression are appropriate; this model has the highest %Deviance explained out of any of the models we have seen so far.
+
+
+
 
 # Question 5
 Refit the model from Question 4, with only the terms that you picked as being significant under spline transformation.  I elected to model all continuous terms as splines, so I will simply repeat the model from question 4.
@@ -139,7 +141,7 @@ The model with 3 smoothed terms is not significantly different from the model th
 
 
 # Question 7
-For the model that passed Question 5, plot the smooth fits.
+For the model that passed Question 5, plot the smooth fits.  Note that I will produce plots in both the model link and response scales.
 
 ```{r}
 color_plot_ls <- function(mod_obj,var_name, var_idx, x_label) {
@@ -179,7 +181,7 @@ par(mfrow=c(1,1))
 
 
 # Question 8
-For the regressions in question 1-5, state the p-value of the smoking variable and state the odds ratio of it.
+For the regressions in questions 1-5, state the p-value of the smoking variable and state the odds ratio of it.
 
 ```{r}
 smok <- function(mod_obj, mod_name) {
@@ -208,13 +210,15 @@ For the model in Question 4 (all continuous terms modeled as splines), find a 95
 
 ```{r}
 logit4_smry <- summary(logit4)
+# grab the coefficient
 beta_smok <- logit4_smry$p.coeff['smoker']
+# grab the coefficient standard error
 se_beta_smok <- logit4_smry$se['smoker']
 
-lower <- exp(beta_smok - 1.96*se_beta_smok)
-upper <- exp(beta_smok + 1.96*se_beta_smok)
+lower <- exp(beta_smok - 1.96*se_beta_smok) # lower bound
+upper <- exp(beta_smok + 1.96*se_beta_smok) # upper bound
 
-cat("Odds ratio given by : ",beta_smok, "\n")
+cat("Odds ratio given by : ",exp(beta_smok), "\n")
 cat("Odds ratio 95% confidence interval given by: ", lower, upper, "\n")
 ```
 
@@ -237,4 +241,4 @@ print(or)
 
 
 # Question 11
-From the analysis conducted, it appears that the probability of having a CHD is positively associated with blood pressure, cholesterol levels, age, and smoking status.  The relationship between the continuous variables (blood pressure, cholesterol, age) and the CHD probability is linear, which means that if we increase any of these by a single unit, we will increase our CHD probability by a set amount, regardless of if we have high or low values of these inputs.  For clarification, if I am age 40, and move to age 41, I will see the same probability increase in CHD, as if I were 60 and moving to age 61, in the presence of other variables.
+From the analysis conducted, it appears that the probability of CHD diagnosis is positively associated with blood pressure, cholesterol levels, age, and smoking status.  The relationship between the continuous variables (blood pressure, cholesterol, age) and the CHD probability is linear, which means that if we increase any of these by a single unit, we will increase our CHD probability by a set amount, regardless of if we have high or low values of these inputs.  For example, if I am age 40, and move to age 41, I will see the same probability increase in CHD diagnosis, as if I were 60 and moving to age 61, in the presence of the other variables.
