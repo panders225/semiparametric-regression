@@ -13,7 +13,7 @@ library("mgcv")
 Import our data and take a look:
 
 ```{r}
-fossil <- read.csv("C:/Users/Philip/Schools/TAMU/STAT_689/homework/semiparametric-regression/misc/fossil2.csv")
+fossil <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/fossil2.csv")
 names(fossil) <- tolower(names(fossil))
 head(fossil)
 summary(fossil)
