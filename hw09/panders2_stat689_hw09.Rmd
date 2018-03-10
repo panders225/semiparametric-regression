@@ -1,0 +1,111 @@
+---
+title: "Homework09"
+author: "Philip Anderson; panders2@tamu.edu"
+date: "3/19/2018"
+output: pdf_document
+---
+
+# Chapter 3 Exercise 1A
+
+```{r, message=FALSE}
+library("AER")
+data("HousePrices")
+library("mgcv")
+str(HousePrices)
+```
+
+```{r}
+fitGaussAM <- mgcv::gam(price ~ s(lotsize, k=27) + bedrooms + factor(bathrooms) +
+                          factor(stories) + factor(driveway) + factor(recreation) + factor(fullbase) +
+                          factor(gasheat) + factor(aircon) + garage + factor(prefer)
+                        , data=HousePrices, family=gaussian
+                        )
+```
+
+
+# Chapter 3 Exercise 1B
+
+```{r}
+mgcv::gam.check(fitGaussAM)
+```
+
+From the above console output, we can see that we may not be using an adequate number of basis functions in the fitting of our smoothed term.  More generally, we have evidence of skewness in our residual plots (qq plot shows skewness, as does the residual histogram), along with some evidence of heteroscedasticity (our fitted vs. residual value plot shows an increase in residual variance as we increase the value of our predictor). 
+
+# Chapter 3 Exercise 1F
+
+```{r}
+# generate data for the hypothetical house described by problem 1F
+X <- data.frame(lotsize=5000
+                , bedrooms=3
+                , bathrooms=2
+                , stories=2
+                , driveway="yes"
+                , recreation="no"
+                , fullbase="yes"
+                , gasheat="yes"
+                , aircon="no"
+                , garage=2
+                , prefer="no"
+                )
+
+X_predict <- predict(fitGaussAM, newdata=X, se.fit=T)
+print("Home price given by: ")
+paste0("Ca$ ", round(X_predict$fit, 2))
+```
+
+# Chapter 3 Exercise 1G
+
+```{r}
+# generate the bounds for a 95% confidence interval
+lwr <- X_predict$fit - (1.96*X_predict$se.fit)
+upr <- X_predict$fit + (1.96*X_predict$se.fit)
+paste0("95% Confidence Interval given by: (", round(lwr, 2), " , ", round(upr, 2), ")")
+```
+
+# Question 4
+Run a cosso on the model in Exercise 1A, along with a stepwise regression.  Compare.
+
+```{r, message=F}
+library("cosso")
+```
+
+# Chapter 3 Question 4
+```{r, message=F}
+library("aplore3")
+library("gam")
+data(icu)
+help(icu)
+```
+
+## 4B
+```{r}
+icu$live <- ifelse(icu$sta==1, 1, 0)
+fitInitial <- gam::gam(live ~ age + factor(gender) + factor(ser)
+                       + factor(can) + factor(crn) + factor(inf) 
+                         + factor(cpr) + sys + hra + factor(pre)  
+                         + factor(type) + factor(fra) + factor(po2) 
+#                         + factor(pco) + factor(bic) + factor(cre) + 
+#                         factor(loc)
+  , data=icu
+  , family=binomial(link="logit")
+)
+stepFit <- gam::step.gam(fitInitial, scope=
+                          list("age" = ~ 1 + age + s(age, 2)
+                               , "gender" = ~ 1 + gender + s(gender, 2)
+                               , "ser" = ~ 1 + ser + s(ser, 2)
+                               , "can" = ~ 1 + can + s(can, 2)
+                               , "crn" = ~ 1 + crn + s(crn, 2)
+                               , "inf" = ~ 1 + inf + s(inf, 2)
+                               , "cpr" = ~ 1 + cpr + s(cpr, 2)
+                               , "sys" = ~ 1 + sys + s(sys, 2)
+                               , "hra" = ~ 1 + hra + s(hra, 2)
+                               , "pre" = ~ 1 + pre + s(pre, 2)
+                               , "type" = ~ 1 + type + s(type, 2)
+                               , "fra" = ~ 1 + fra + s(fra, 2)
+                               , "po2" = ~ 1 + po2 + s(po2, 2)
+                               
+                               ) 
+                           )
+```
+
+

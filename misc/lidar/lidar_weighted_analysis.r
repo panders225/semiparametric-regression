@@ -22,6 +22,7 @@ library(mgcv)
 # Get the data 
 ###########################################################
 thedata   = read.csv(file='lidar.csv')
+thedata = read.csv('/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/lidar/lidar.csv')
 range     = thedata$range
 logratio  = thedata$logratio
 n         = length(range)
@@ -36,7 +37,9 @@ x    = range
 y    = abs(gam_default$residuals)
 gam_default_abs = gam(y~s(x,bs="cr"), data=thedata)
 plot(x,fitted(gam_default_abs),lwd=3,type='l',col='blue')
+plot(gam_default)
 ###########################################################
+
 # Form the weights
 ###########################################################
 weight = 1 / (fitted(gam_default_abs) ^ 2)
