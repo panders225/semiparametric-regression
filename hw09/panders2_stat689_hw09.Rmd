@@ -257,7 +257,87 @@ cosso_mod <- cosso::cosso(x=icu[3:21]
 
 
 # Question 7
-```{r}
-help(gam)
+## 7A
+```{r, message=FALSE}
+library("kernlab")
+data(spam)
+print(names(spam))
 ```
+
+## 7B
+Generate our testing and training data sets through randomization
+```{r}
+set.seed(1)
+nTest <- 1000
+indsTest <- sample(1:nrow(spam), nTest, replace=FALSE)
+indsTrain <- setdiff(1:nrow(spam), indsTest)
+spamTest <- spam[indsTest, ]
+spamTrain <- spam[indsTrain, ]
+```
+
+## 7C
+Fit a logistic GLM including all possible predictors.
+
+```{r}
+fitTrainFullGLM <- glm(type ~ .
+                       , family=binomial(link="logit")
+                       , data=spamTrain
+                       )
+print(summary(fitTrainFullGLM))
+```
+
+## 7D
+```{r}
+test_mod <- mgcv::gam(type ~ make + address
+                      , data=spamTrain
+                      , family=binomial(link="logit")
+                      , select=T
+                        )
+mgcv::summary.gam(test_mod)
+```
+
+Fit the logistic GLM based on this subset.
+```{r}
+new_mod <- glm(type ~ make + address
+               , data=spamTrain
+               , family=binomial(link="logit")
+               )
+
+```
+
+## 7E
+Make predictions for the test data classify as spam if prediction probability exceeds 0.5.
+
+```{r}
+spamTest_preds <- predict.glm(object=new_mod, newdata=spamTest, type="response")
+# spam=2
+pre_conf <- data.frame(cbind(spam_fl=spamTest$type
+                             , spam_pred=spamTest_preds))
+pre_conf$pred_decision <- ifelse(pre_conf$spam_pred>0.5, 2, 1)
+
+conf_table <- table(pre_conf$spam_fl, pre_conf$pred_decision)
+caret::confusionMatrix(conf_table)
+```
+
+## 7F
+Fit the same model as in part E, but fit all terms with smoothing splines.  Apply the same classification criterion.
+
+```{r}
+refit_mod <- mgcv::gam(type ~ s(make) + s(address)
+                      , data=spamTrain
+                      , family=binomial(link="logit")
+                       )
+```
+
+```{r}
+refit_preds <- predict.gam(object=refit_mod, newdata=spamTest, type="response")
+refit_pre_conf <- data.frame(cbind(spam_fl=spamTest$type
+                        , spam_pred=refit_preds
+                        ))
+refit_pre_conf$pred_decision <- ifelse(refit_pre_conf$spam_pred > 0.5, 2, 1)
+refit_conf_table <- table(refit_pre_conf$spam_fl, refit_pre_conf$pred_decision)
+caret::confusionMatrix(refit_conf_table)
+```
+
+
 
