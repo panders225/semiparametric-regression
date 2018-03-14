@@ -10,7 +10,7 @@ output: pdf_document
 ```{r, message=FALSE}
 library("AER")
 data("HousePrices")
-library("mgcv")
+#library("mgcv")
 str(HousePrices)
 ```
 
@@ -29,7 +29,7 @@ fitGaussAM <- mgcv::gam(price ~ s(lotsize, k=27) + bedrooms + factor(bathrooms) 
 mgcv::gam.check(fitGaussAM)
 ```
 
-From the above console output, we can see that we may not be using an adequate number of basis functions in the fitting of our smoothed term.  More generally, we have evidence of skewness in our residual plots (qq plot shows skewness, as does the residual histogram), along with some evidence of heteroscedasticity (our fitted vs. residual value plot shows an increase in residual variance as we increase the value of our predictor). 
+From the above console output, we can see a p-value that indicates we may not be using an adequate number of basis functions in the fitting of our smoothed term.  More generally, we have evidence of skewness in our residual plots (qq plot shows skewness, as does the residual histogram), along with some evidence of heteroscedasticity (our fitted vs. residual value plot shows an increase in residual variance as we increase the value of our predictor). 
 
 # Chapter 3 Exercise 1F
 
@@ -69,43 +69,195 @@ Run a cosso on the model in Exercise 1A, along with a stepwise regression.  Comp
 library("cosso")
 ```
 
+```{r}
+# one-hot encode the factors  
+mod_mat <- stats::model.matrix(~ driveway + recreation + fullbase + gasheat + 
+                                 aircon + prefer
+                               , data=HousePrices)
+head(mod_mat)
+```
+
+```{r}
+# prep the data for input into regularized GAM
+X1 <- as.matrix(HousePrices[, c(2, 3, 4, 5, 11)])
+X2 <- mod_mat <- stats::model.matrix(~ driveway + recreation + fullbase + gasheat + 
+                                 aircon + prefer
+                               , data=HousePrices)[, -1]
+# complete design matrix
+X <- cbind(X1, X2)
+# complete response vector
+y <- HousePrices[, 1]
+
+```
+
+
+```{r}
+test_mod <- cosso::cosso(x=X, y=y, family="Gaussian")
+```
+
+```{r, message=FALSE}
+library("gam")
+```
+
+```{r}
+
+house_init <- gam::gam(price ~ s(lotsize, 27) + bedrooms + factor(bathrooms)
+                         + factor(stories) + factor(driveway) + factor(recreation) + factor(fullbase) 
+                          + factor(gasheat) + factor(aircon) + garage + factor(prefer)
+                        , data=HousePrices
+                       , family=gaussian
+                       )
+
+house_step <- gam::step.gam(house_init, scope=list(
+                             "lotsize" = ~1 + lotsize + s(lotsize, 2)
+                             , "bedrooms" = ~1 + bedrooms
+                             , "bathrooms" = ~ 1 + bathrooms
+                             , "stories" = ~ 1 + stories
+                             , "driveway" =  ~ 1 + driveway
+                             , "recreation" =  ~ 1 + recreation
+                             , "fullbase" = ~ 1 + fullbase
+                             , "gasheat" = ~ 1 + gasheat
+                             , "aircon" = ~ 1 + aircon
+                             , "garage" = ~ 1 + garage + s(garage, 2)
+                             , "prefer" = ~ 1 + prefer
+                            )
+                            , trace=T
+                            , direction="forward"
+                              )
+
+
+```
+
+```{r}
+names(house_step$model)[-1]
+```
+
+From the stepwise output, it appears that we could not have improved the model by taking away any terms - we appear to have selected the correct model from the beginning.  This is perhaps unsurprising - if we examine summary output for the initial model fit, we can see that all of the included terms are highly significant (see below).
+
+```{r}
+summary(house_init)
+```
+
+
 # Chapter 3 Question 4
+## 4A
 ```{r, message=F}
 library("aplore3")
 library("gam")
 data(icu)
-help(icu)
+```
+
+```{r}
+str(icu)
 ```
 
 ## 4B
 ```{r}
-icu$live <- ifelse(icu$sta==1, 1, 0)
-fitInitial <- gam::gam(live ~ age + factor(gender) + factor(ser)
-                       + factor(can) + factor(crn) + factor(inf) 
-                         + factor(cpr) + sys + hra + factor(pre)  
-                         + factor(type) + factor(fra) + factor(po2) 
-#                         + factor(pco) + factor(bic) + factor(cre) + 
-#                         factor(loc)
+# just to make sure nothing gets messed up, recode the live variable
+icu$live <- ifelse(icu$sta=="Lived", 1, 0)
+table(icu$live, icu$sta) # quick check
+# initial model object
+fitInitial <- gam::gam(live ~ age + gender + race + ser
+                       + can + crn + inf 
+                         + cpr + sys + hra + pre  
+                         + type + fra + po2 
+                         + pco + bic + cre + 
+                         loc
   , data=icu
   , family=binomial(link="logit")
 )
+# stepwise regression setup
 stepFit <- gam::step.gam(fitInitial, scope=
                           list("age" = ~ 1 + age + s(age, 2)
-                               , "gender" = ~ 1 + gender + s(gender, 2)
-                               , "ser" = ~ 1 + ser + s(ser, 2)
-                               , "can" = ~ 1 + can + s(can, 2)
-                               , "crn" = ~ 1 + crn + s(crn, 2)
-                               , "inf" = ~ 1 + inf + s(inf, 2)
-                               , "cpr" = ~ 1 + cpr + s(cpr, 2)
+                               , "gender" = ~ 1 + gender
+                               , "ser" = ~ 1 + ser
+                               , "can" = ~ 1 + can
+                               , "crn" = ~ 1 + crn
+                               , "inf" = ~ 1 + inf
+                               , "cpr" = ~ 1 + cpr
                                , "sys" = ~ 1 + sys + s(sys, 2)
                                , "hra" = ~ 1 + hra + s(hra, 2)
-                               , "pre" = ~ 1 + pre + s(pre, 2)
-                               , "type" = ~ 1 + type + s(type, 2)
-                               , "fra" = ~ 1 + fra + s(fra, 2)
-                               , "po2" = ~ 1 + po2 + s(po2, 2)
-                               
+                               , "pre" = ~ 1 + pre
+                               , "type" = ~ 1 + type
+                               , "fra" = ~ 1 + fra 
+                               , "po2" = ~ 1 + po2 
+                               , "ph" = ~ 1 + ph
+                               , "pco" = ~ 1 + pco 
+                               , "bic" = ~ 1 + bic 
+                               , "cre" = ~ 1 + cre 
+                               , "loc" = ~ 1 + loc
                                ) 
                            )
 ```
 
+The step trace was printed above, but let's take a look to see what the final model is:
+
+```{r}
+(step_vars <- names(stepFit$model)[-1])
+```
+
+## 3C - Use mgcv::gam to re-fit the model selected in part B with GCV used for seelction of the smoothing paramters.
+```{r}
+refit_gcv <- mgcv::gam(live ~ race + s(age) + gender + can + cpr + sys + pre + type + 
+                         ph + pco + loc
+          , data=icu
+          , family=binomial(link="logit")
+          , method="GCV.Cp"
+          )
+```
+
+```{r}
+mgcv::summary.gam(refit_gcv)
+print("-------")
+print("-------")
+print("-------")
+mgcv::gam.check(refit_gcv)
+```
+
+
+## 3D
+Use the refitted GAM model to score a new record with described characteristics
+```{r}
+new_rec <- data.frame(
+    age=79
+    , gender="Female"
+    , race="White"
+    , ser="Medical"
+    , can="No"
+    , crn="No"
+    , inf="No"
+    , cpr="No"
+    , sys=228
+    , hra=94
+    , pre="No"
+    , type="Emergency"
+    , fra="No"
+    , po2="<=60"
+    , ph=">= 7.25"
+    , pco="> 45"
+    , bic="< 18"
+    , cre="> 2.0"
+    , loc="Coma"
+)
+
+new_rec_pred <- mgcv::predict.gam(refit_gcv, newdata=new_rec, type="response")
+print(new_rec_pred)
+```
+
+## 6
+Compare the stepwise and cosso models for Exercise 4 in Chapter 3 
+
+```{r}
+# first, we need to actually fit a cosso model to have something available for comparison
+cosso_mod <- cosso::cosso(x=icu[3:21]
+                            , y=icu$live
+                            , family="Binomial"
+                          )
+```
+
+
+# Question 7
+```{r}
+help(gam)
+```
 
