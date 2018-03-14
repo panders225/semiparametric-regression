@@ -1,0 +1,186 @@
+---
+title: "Assignment10; STAT 689"
+author: "Philip Anderson; panders2@tamu.edu"
+date: "3/21/2018"
+output: pdf_document
+---
+
+# Question 10
+## 10A
+```{r}
+library("HRW")
+data(ragweed)
+
+```
+
+```{r}
+str(ragweed)
+```
+
+## 10B
+
+```{r}
+fit1 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27, by=factor(year))
+                  + temperatureResidual + rain + s(windSpeed, k=27) 
+                 , data=ragweed
+                 , family=poisson
+                   )
+
+```
+
+
+```{r}
+mgcv::gam.check(fit1)
+qqnorm(residuals(fit1, type="scaled.pearson"))
+abline(0, 1, col="red")
+```
+
+## 10C
+Obtain alternative fits
+
+```{r}
+fit2 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27, by=factor(year))
+                  + temperatureResidual + rain + s(windSpeed, k=27) 
+                 , data=ragweed
+                 , family=quasipoisson
+                   )
+
+```
+
+```{r}
+fit3 <- mgcv::gam(sqrt(pollenCount) ~ factor(year) + s(dayInSeason, k=27, by=factor(year))
+                  + temperatureResidual + rain + s(windSpeed, k=27) 
+                 , data=ragweed
+                 , family=gaussian(link="identity")
+                   )
+
+```
+
+## 10D
+Obtain residual plots, analogous to those obtained for fit1 in Part B
+
+```{r}
+mgcv::gam.check(fit2)
+qqnorm(residuals(fit2, type="scaled.pearson"))
+abline(0, 1, col="red")
+```
+
+```{r}
+mgcv::gam.check(fit3)
+qqnorm(residuals(fit3, type="scaled.pearson"))
+abline(0, 1, col="red")
+```
+
+Based on the above summaries, I believe that the Gaussian fit (fit3) is superior to the Poisson and QuasiPoisson fits.  
+
+```{r}
+# graphical representations are available above
+mgcv::summary.gam(fit3)
+```
+
+## 10F
+Come back later
+
+# Question 2
+
+For the square root transformation (fit3), see whether the idea of constant variance is reasonable.
+```{r}
+resid <- abs(residuals(fit3))
+fitted <- fitted(fit3)
+plot(fitted, resid
+     , main="Fitted Values vs. Absolute Residuals - Fit 3"
+     , xlab="Fitted Values"
+     , ylab="Abs. Residuals"
+     )
+
+```
+
+From the above plot, it does not appear that the assumption of constant variance is reasonable. 
+
+# Question 3
+From the estimated scale in the QuasiPoisson model, does the scale parameter imply that we may have concern about overdispersion?
+
+```{r}
+fit2$scale
+```
+
+Considering that we are looking for a scale value of 1, I believe we do have legitimate concerns about overdispersion.
+
+## Question 4
+Test whether the QuasiPoisson fit is statistically significantly different from the Poisson fit.
+
+```{r}
+anova(fit1, fit2, test="Chisq")
+```
+
+It appears that we have statistically significant differences between the Poisson and QuasiPoisson fits.
+
+# Question 5
+In the Poisson fit, is there evidence that there is a year by dayInSeason interaction?
+
+```{r}
+mgcv::summary.gam(fit1)
+```
+
+```{r}
+smaller_fit1 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27)
+                  + temperatureResidual + rain + s(windSpeed, k=27) 
+                 , data=ragweed
+                 , family=poisson
+                   )
+anova(fit1, smaller_fit1, test="Chisq")
+
+```
+
+Both evaluations suggest significant evidence of a year by dayInSeason interaction.
+
+# Question 6
+Remove the interaction from the model, still doing the quasipoisson; do a stepwise regression - which model is seleted?
+
+```{r}
+detach("package:mgcv", unload=TRUE)
+library("gam")
+```
+
+```{r}
+str(ragweed)
+```
+
+```{r}
+quasi_init <- gam::gam(pollenCount ~ factor(year) + dayInSeason
+                  + temperatureResidual + rain + windSpeed 
+                 , data=ragweed
+                 , family=quasipoisson(link="log")
+                   )
+
+
+quasi_step <- gam::step.gam(quasi_init, scope=list(
+                        "year" = ~1 + year
+                        , "dayInSeason" = ~1 + dayInSeason + s(dayInSeason, 2)
+                        , "temperatureResidual" = ~1 + temperatureResidual +  s(temperatureResidual, 2)
+                        , "rain" = ~1 + rain + s(rain, 2)
+                        , "windspeed" = ~1 + windspeed + s(windspeed, 2)
+                        )
+                        , 
+                          )
+
+
+
+```
+
+# Question 7
+
+```{r}
+str(ragweed)
+```
+
+```{r}
+Y <- ragweed$pollenCount
+Y_alt <- log(ragweed$pollenCount)
+X <- ragweed[, c(2, 3, 5, 6, 7)]
+```
+
+```{r}
+cosso_mod <- cosso::cosso(x=X, y=Y_alt, family="Gaussian")
+```
+
