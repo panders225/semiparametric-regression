@@ -40,11 +40,12 @@ names(X) <- c("percent qualifying for CalWorks",
               "percent English learners",
               "expenditure per student",
               "student:teacher ratio")
-
+head(X)
 ###########################################################
 # Run the cosso
 ###########################################################
 fitCOSSO <- cosso(X,mathScore,scale = TRUE,family=c("Gaussian"))
+
 ###########################################################
 # Show for what values of M that the variables enter
 ###########################################################

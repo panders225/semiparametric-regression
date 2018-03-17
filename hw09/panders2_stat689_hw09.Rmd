@@ -1,37 +1,43 @@
 ---
 title: "Homework09"
 author: "Philip Anderson; panders2@tamu.edu"
-date: "3/19/2018"
+date: "3/21/2018"
 output: pdf_document
 ---
 
-# Chapter 3 Exercise 1A
+# Question 1
+## Chapter 3 Exercise 1A
 
 ```{r, message=FALSE}
+library("tidyverse")
 library("AER")
 data("HousePrices")
-#library("mgcv")
+library("mgcv")
+# take a look to see variable listing and format
 str(HousePrices)
 ```
 
 ```{r}
 fitGaussAM <- mgcv::gam(price ~ s(lotsize, k=27) + bedrooms + factor(bathrooms) +
-                          factor(stories) + factor(driveway) + factor(recreation) + factor(fullbase) +
+                          factor(stories) + factor(driveway) + factor(recreation) 
+                        + factor(fullbase) +
                           factor(gasheat) + factor(aircon) + garage + factor(prefer)
-                        , data=HousePrices, family=gaussian
+                        , data=HousePrices
+                        , family=gaussian
                         )
 ```
 
-
-# Chapter 3 Exercise 1B
-
+# Question 2
+## Chapter 3 Exercise 1B
+Evaluate whether or not the residuals are consistent with the model assumptions.
 ```{r}
 mgcv::gam.check(fitGaussAM)
 ```
 
-From the above console output, we can see a p-value that indicates we may not be using an adequate number of basis functions in the fitting of our smoothed term.  More generally, we have evidence of skewness in our residual plots (qq plot shows skewness, as does the residual histogram), along with some evidence of heteroscedasticity (our fitted vs. residual value plot shows an increase in residual variance as we increase the value of our predictor). 
+From the above output, it appears that we have evidence of skewness in our residual plots (qq plot shows skewness, as does the residual histogram).  It also appears that we have some evidence of heteroscedasticity (our fitted vs. residual value plot shows an increase in residual variance as we increase the value of our predictor).  Additionally, the p-value from our console output suggests that we should be using a larger number of basis functions for smoothed predictor, _lotsize_. 
 
-# Chapter 3 Exercise 1F
+# Question 3
+## Chapter 3 Exercise 1F
 
 ```{r}
 # generate data for the hypothetical house described by problem 1F
@@ -53,10 +59,12 @@ print("Home price given by: ")
 paste0("Ca$ ", round(X_predict$fit, 2))
 ```
 
-# Chapter 3 Exercise 1G
+The predicted home price is given by $94,511.07.
+
+## Chapter 3 Exercise 1G
 
 ```{r}
-# generate the bounds for a 95% confidence interval
+# generate the bounds for a 95% confidence interval for the mean house price
 lwr <- X_predict$fit - (1.96*X_predict$se.fit)
 upr <- X_predict$fit + (1.96*X_predict$se.fit)
 paste0("95% Confidence Interval given by: (", round(lwr, 2), " , ", round(upr, 2), ")")
@@ -69,47 +77,80 @@ Run a cosso on the model in Exercise 1A, along with a stepwise regression.  Comp
 library("cosso")
 ```
 
+I am first going to prep the data to get it into a form that the COSSO package appears to be looking for (I suspect that it may struggle with factor encodings).
+
 ```{r}
-# one-hot encode the factors  
-mod_mat <- stats::model.matrix(~ driveway + recreation + fullbase + gasheat + 
+# select out non-factor variables
+X1 <- as.matrix(HousePrices[, c(2, 3, 4, 5, 11)])
+# one-hot encode the factors
+X2 <- mod_mat <- stats::model.matrix(~ -1 + driveway + recreation + fullbase + gasheat + 
                                  aircon + prefer
                                , data=HousePrices)
-head(mod_mat)
-```
-
-```{r}
-# prep the data for input into regularized GAM
-X1 <- as.matrix(HousePrices[, c(2, 3, 4, 5, 11)])
-X2 <- mod_mat <- stats::model.matrix(~ driveway + recreation + fullbase + gasheat + 
-                                 aircon + prefer
-                               , data=HousePrices)[, -1]
 # complete design matrix
-X <- cbind(X1, X2)
+X <- data.frame(cbind(X1, X2))
 # complete response vector
 y <- HousePrices[, 1]
-
+y_alt <- log(y)
 ```
 
 
 ```{r}
-test_mod <- cosso::cosso(x=X, y=y, family="Gaussian")
+# attempt a cosso
+cosso_mod <- cosso::cosso(x=X, y=y, family=c("Gaussian"))
 ```
 
+```{r}
+# follow-up on suspicion that lack of normality in response variable distribution may be causing some issues.
+# conduct test of normality for response and log-transformed response.
+print(shapiro.test(y))
+print(shapiro.test(y_alt))
+
+# y_alt follows normal distribution - retry COSSO model
+```
+
+```{r}
+cosso_mod2 <- cosso::cosso(x=X, y=y_alt, family=c("Gaussian"))
+```
+
+```{r}
+# maybe the way I've encoded the data is the issue.  Try again
+cosso_mod3 <- cosso::cosso(x=HousePrices[, -1]
+                           , y=HousePrices[, 1]
+                           , family=c("Gaussian")
+                           )
+
+```
+
+```{r}
+cosso_mod4 <- cosso::cosso(x=HousePrices[, -1]
+                           , y=log(HousePrices[, 1])
+                           , family=c("Gaussian")
+                           )
+
+```
+
+The COSSO package does not seem to be able to solve the matrices we are giving it.  Move on to the stepwise regression.
+
 ```{r, message=FALSE}
+detach("package:mgcv", unload=TRUE)
 library("gam")
 ```
+
 
 ```{r}
 
 house_init <- gam::gam(price ~ s(lotsize, 27) + bedrooms + factor(bathrooms)
-                         + factor(stories) + factor(driveway) + factor(recreation) + factor(fullbase) 
+                         + factor(stories) + factor(driveway) + factor(recreation) 
+                       + factor(fullbase) 
                           + factor(gasheat) + factor(aircon) + garage + factor(prefer)
                         , data=HousePrices
                        , family=gaussian
                        )
 
+# note that I am only allowing the continuous terms the possibility of 
+# entering the model as smooths
 house_step <- gam::step.gam(house_init, scope=list(
-                             "lotsize" = ~1 + lotsize + s(lotsize, 2)
+                             "lotsize" = ~1 + lotsize + s(lotsize, 23)
                              , "bedrooms" = ~1 + bedrooms
                              , "bathrooms" = ~ 1 + bathrooms
                              , "stories" = ~ 1 + stories
@@ -118,7 +159,7 @@ house_step <- gam::step.gam(house_init, scope=list(
                              , "fullbase" = ~ 1 + fullbase
                              , "gasheat" = ~ 1 + gasheat
                              , "aircon" = ~ 1 + aircon
-                             , "garage" = ~ 1 + garage + s(garage, 2)
+                             , "garage" = ~ 1 + garage + s(garage, 23)
                              , "prefer" = ~ 1 + prefer
                             )
                             , trace=T
@@ -128,6 +169,7 @@ house_step <- gam::step.gam(house_init, scope=list(
 
 ```
 
+
 ```{r}
 names(house_step$model)[-1]
 ```
@@ -135,29 +177,34 @@ names(house_step$model)[-1]
 From the stepwise output, it appears that we could not have improved the model by taking away any terms - we appear to have selected the correct model from the beginning.  This is perhaps unsurprising - if we examine summary output for the initial model fit, we can see that all of the included terms are highly significant (see below).
 
 ```{r}
-summary(house_init)
+gam::summary.gam(house_init)
 ```
 
 
-# Chapter 3 Question 4
-## 4A
+# Question 5
+## Chapter 3 Question 4
+### 4A
 ```{r, message=F}
 library("aplore3")
-library("gam")
 data(icu)
 ```
 
 ```{r}
+# take a look 
 str(icu)
 ```
+```{r}
+head(icu)
+```
 
-## 4B
+### 4B
+Select a logistic gam with the response variable being the indicator of a patient dying.
 ```{r}
 # just to make sure nothing gets messed up, recode the live variable
 icu$live <- ifelse(icu$sta=="Lived", 1, 0)
 table(icu$live, icu$sta) # quick check
 # initial model object
-fitInitial <- gam::gam(live ~ age + gender + race + ser
+icu_init <- gam::gam(live ~ age + gender + race + ser
                        + can + crn + inf 
                          + cpr + sys + hra + pre  
                          + type + fra + po2 
@@ -167,7 +214,7 @@ fitInitial <- gam::gam(live ~ age + gender + race + ser
   , family=binomial(link="logit")
 )
 # stepwise regression setup
-stepFit <- gam::step.gam(fitInitial, scope=
+icu_step <- gam::step.gam(icu_init, scope=
                           list("age" = ~ 1 + age + s(age, 2)
                                , "gender" = ~ 1 + gender
                                , "ser" = ~ 1 + ser
@@ -193,11 +240,12 @@ stepFit <- gam::step.gam(fitInitial, scope=
 The step trace was printed above, but let's take a look to see what the final model is:
 
 ```{r}
-(step_vars <- names(stepFit$model)[-1])
+(step_vars <- names(icu_step$model)[-1])
 ```
 
-## 3C - Use mgcv::gam to re-fit the model selected in part B with GCV used for seelction of the smoothing paramters.
-```{r}
+### 4C - Use mgcv::gam to re-fit the model selected in part B with GCV used for selction of the smoothing paramters.
+```{r, message=F}
+library("mgcv")
 refit_gcv <- mgcv::gam(live ~ race + s(age) + gender + can + cpr + sys + pre + type + 
                          ph + pco + loc
           , data=icu
@@ -209,14 +257,15 @@ refit_gcv <- mgcv::gam(live ~ race + s(age) + gender + can + cpr + sys + pre + t
 ```{r}
 mgcv::summary.gam(refit_gcv)
 print("-------")
-print("-------")
+print("gam.check output")
 print("-------")
 mgcv::gam.check(refit_gcv)
 ```
 
+The model does not appear to be a great fit to the data - the residual histogram suffers from dramatic left-skewness. 
 
-## 3D
-Use the refitted GAM model to score a new record with described characteristics
+### 4D
+Use the refitted GAM model to score a new record with the described characteristics. 
 ```{r}
 new_rec <- data.frame(
     age=79
@@ -232,31 +281,67 @@ new_rec <- data.frame(
     , pre="No"
     , type="Emergency"
     , fra="No"
-    , po2="<=60"
+    , po2="<= 60"
     , ph=">= 7.25"
     , pco="> 45"
     , bic="< 18"
     , cre="> 2.0"
     , loc="Coma"
 )
-
+# get prediction on the response scale, rather than logit.
 new_rec_pred <- mgcv::predict.gam(refit_gcv, newdata=new_rec, type="response")
 print(new_rec_pred)
 ```
 
-## 6
+# Question 6
 Compare the stepwise and cosso models for Exercise 4 in Chapter 3 
 
 ```{r}
-# first, we need to actually fit a cosso model to have something available for comparison
-cosso_mod <- cosso::cosso(x=icu[3:21]
+# first, fit a cosso model
+icu_cosso1 <- cosso::cosso(x=icu[3:21]
                             , y=icu$live
-                            , family="Binomial"
+                            , family=c("Binomial")
                           )
 ```
 
+```{r}
+# try out an alternative design matrix.
+X1 <- stats::model.matrix(~-1 + gender + race + ser + can + crn + inf + cpr + pre + type + fra + po2 + ph + pco + bic + cre + loc, data=icu)
+X2 <- icu %>%
+  dplyr::select(age, sys, hra)
+y <- icu$live
+X <- data.frame(cbind(X1, X2))
+```
+
+```{r}
+icu_cosso2 <- cosso::cosso(x=X, y=y, family=c("Binomial"))
+```
+
+It does not appear that the cosso regularization implementation is appropriate for the design matrix we are using.  I have no model to compare to the stepwise selection model from Exercise 4 in Chapter 3.
 
 # Question 7
+Rerun the model from Chapter 3, Exercise 4 using mgcv's regularization implementation.
+
+```{r}
+icu_mgcv <- mgcv::gam(live ~ s(age) + gender + race + ser
+                       + can + crn + inf 
+                         + cpr + s(sys) + s(hra) + pre  
+                         + type + fra + po2 
+                         + pco + bic + cre + 
+                         loc
+  , data=icu
+  , family=binomial(link="logit")
+  , select=TRUE
+)
+(icu_mgcv_smry <- mgcv::summary.gam(icu_mgcv))
+```
+
+Final model using this selection method is given by the following formula:
+```{r}
+icu_mgcv_smry$p.coeff
+```
+
+# Question 8
 ## 7A
 ```{r, message=FALSE}
 library("kernlab")
@@ -269,8 +354,8 @@ Generate our testing and training data sets through randomization
 ```{r}
 set.seed(1)
 nTest <- 1000
-indsTest <- sample(1:nrow(spam), nTest, replace=FALSE)
-indsTrain <- setdiff(1:nrow(spam), indsTest)
+indsTest <- base::sample(1:nrow(spam), nTest, replace=FALSE)
+indsTrain <- base::setdiff(1:nrow(spam), indsTest)
 spamTest <- spam[indsTest, ]
 spamTrain <- spam[indsTrain, ]
 ```
