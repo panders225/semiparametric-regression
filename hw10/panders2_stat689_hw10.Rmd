@@ -7,13 +7,10 @@ output: pdf_document
 
 # Question 10
 ## 10A
-```{r}
+```{r, message=FALSE}
+library("mgcv")
 library("HRW")
 data(ragweed)
-
-```
-
-```{r}
 str(ragweed)
 ```
 
@@ -28,17 +25,18 @@ fit1 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27, by=factor(ye
 
 ```
 
-
+Obtain residual plots for the models.
 ```{r}
 mgcv::gam.check(fit1)
-qqnorm(residuals(fit1, type="scaled.pearson"))
+qqnorm(residuals(fit1, type="scaled.pearson"), main="Second QQ-Plot")
 abline(0, 1, col="red")
 ```
 
 ## 10C
-Obtain alternative fits
+Obtain alternative fits.
 
 ```{r}
+# quasipoisson
 fit2 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27, by=factor(year))
                   + temperatureResidual + rain + s(windSpeed, k=27) 
                  , data=ragweed
@@ -48,6 +46,7 @@ fit2 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27, by=factor(ye
 ```
 
 ```{r}
+# square root variance transformation
 fit3 <- mgcv::gam(sqrt(pollenCount) ~ factor(year) + s(dayInSeason, k=27, by=factor(year))
                   + temperatureResidual + rain + s(windSpeed, k=27) 
                  , data=ragweed
@@ -57,29 +56,57 @@ fit3 <- mgcv::gam(sqrt(pollenCount) ~ factor(year) + s(dayInSeason, k=27, by=fac
 ```
 
 ## 10D
-Obtain residual plots, analogous to those obtained for fit1 in Part B
+Obtain residual plots for the new fits, analogous to those obtained for fit1 in Part B
 
 ```{r}
+# quasipoisson
 mgcv::gam.check(fit2)
-qqnorm(residuals(fit2, type="scaled.pearson"))
+qqnorm(residuals(fit2, type="scaled.pearson")
+       , main="Quasipoisson Fit: Second QQ-Plot")
 abline(0, 1, col="red")
 ```
 
 ```{r}
 mgcv::gam.check(fit3)
-qqnorm(residuals(fit3, type="scaled.pearson"))
+qqnorm(residuals(fit3, type="scaled.pearson")
+       , main="Gaussian Fit: Second QQ-Plot"
+       )
 abline(0, 1, col="red")
 ```
 
-Based on the above summaries, I believe that the Gaussian fit (fit3) is superior to the Poisson and QuasiPoisson fits.  
+## 10E
+
+Based on the above summaries, I believe that the Gaussian fit for the square root transformation (fit3) is superior to the Poisson and QuasiPoisson fits.  The scaled Pearson residual QQ-Norm plot shows that the Gaussian response distribution seems to result in a superior fit to the data.
 
 ```{r}
-# graphical representations are available above
+# graphical representations are available in the previous question
+# numerical summary immediately below.
 mgcv::summary.gam(fit3)
 ```
 
 ## 10F
-Come back later
+Show the four penalized spline fits for the effect of dayInSeason on the mean response.
+
+```{r}
+par(mfrow=c(2,2))
+plot(fit3, shade=TRUE, col="blue", rug=TRUE, select=c(1)
+     , main="dayInSeason for 1991"
+     , ylab="pollen count"
+     )
+plot(fit3, shade=TRUE, col="blue", rug=TRUE, select=c(2)
+     , main="dayInSeason for 1992"
+     , ylab="pollen count"
+     )
+plot(fit3, shade=TRUE, col="blue", rug=TRUE, select=c(3)
+     , main="dayInSeason for 1993"
+     , ylab="pollen count"
+     )
+plot(fit3, shade=TRUE, col="blue", rug=TRUE, select=c(4)
+     , main="dayInSeason for 1994"
+     , ylab="pollen count"
+     )
+par(mfrow=c(1,1))
+```
 
 # Question 2
 
@@ -95,13 +122,14 @@ plot(fitted, resid
 
 ```
 
-From the above plot, it does not appear that the assumption of constant variance is reasonable. 
+From the above plot, it does not appear that the assumption of constant variance is reasonable.  As our fitted values increase, the variance of our absolute residuals increases.  
 
 # Question 3
 From the estimated scale in the QuasiPoisson model, does the scale parameter imply that we may have concern about overdispersion?
 
 ```{r}
-fit2$scale
+print("Scale Parameter given by:")
+print(fit2$scale)
 ```
 
 Considering that we are looking for a scale value of 1, I believe we do have legitimate concerns about overdispersion.
@@ -113,7 +141,7 @@ Test whether the QuasiPoisson fit is statistically significantly different from 
 anova(fit1, fit2, test="Chisq")
 ```
 
-It appears that we have statistically significant differences between the Poisson and QuasiPoisson fits.
+It appears that we have statistically significant differences between the Poisson and QuasiPoisson fits.  The QuasiPoisson is preferable in this case.
 
 # Question 5
 In the Poisson fit, is there evidence that there is a year by dayInSeason interaction?
@@ -122,6 +150,9 @@ In the Poisson fit, is there evidence that there is a year by dayInSeason intera
 mgcv::summary.gam(fit1)
 ```
 
+From the above output, it appears that we have a significant interaction between the year and dayInSeason variables. 
+
+We can also create similar model that does not have the interaction, and test them against each other.
 ```{r}
 smaller_fit1 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27)
                   + temperatureResidual + rain + s(windSpeed, k=27) 
@@ -137,50 +168,77 @@ Both evaluations suggest significant evidence of a year by dayInSeason interacti
 # Question 6
 Remove the interaction from the model, still doing the quasipoisson; do a stepwise regression - which model is seleted?
 
-```{r}
+```{r, message=FALSE, error=T}
 detach("package:mgcv", unload=TRUE)
 library("gam")
 ```
 
+For the following, the quasipoisson response distribution appears to be incompatible with the step.gam function.  I use poisson and gaussian response distributions for model selection.
 ```{r}
-str(ragweed)
-```
-
-```{r}
-quasi_init <- gam::gam(pollenCount ~ factor(year) + dayInSeason
-                  + temperatureResidual + rain + windSpeed 
+pois_init <- gam::gam(pollenCount ~ factor(year) + dayInSeason
+                  + temperatureResidual + rain + windSpeed
                  , data=ragweed
-                 , family=quasipoisson(link="log")
+                 , family=poisson(link="log")
                    )
 
 
-quasi_step <- gam::step.gam(quasi_init, scope=list(
+pois_step <- gam::step.gam(pois_init, scope=list(
                         "year" = ~1 + year
                         , "dayInSeason" = ~1 + dayInSeason + s(dayInSeason, 2)
-                        , "temperatureResidual" = ~1 + temperatureResidual +  s(temperatureResidual, 2)
-                        , "rain" = ~1 + rain + s(rain, 2)
-                        , "windspeed" = ~1 + windspeed + s(windspeed, 2)
+                        , "temperatureResidual" = ~1 + temperatureResidual 
+                        , "rain" = ~1 + rain
+                        , "windSpeed" = ~1 + windSpeed + s(windSpeed, 2)
                         )
-                        , 
                           )
-
-
-
 ```
-
-# Question 7
 
 ```{r}
-str(ragweed)
+gauss_init <- gam::gam(sqrt(pollenCount) ~ factor(year) + dayInSeason
+                  + temperatureResidual + rain + windSpeed
+                 , data=ragweed
+                 , family=gaussian(link="identity")
+                   )
+
+
+gauss_step <- gam::step.gam(gauss_init, scope=list(
+                        "year" = ~1 + year
+                        , "dayInSeason" = ~1 + dayInSeason + s(dayInSeason, 2)
+                        , "temperatureResidual" = ~1 + temperatureResidual 
+                        , "rain" = ~1 + rain
+                        , "windSpeed" = ~1 + windSpeed + s(windSpeed, 2)
+                        )
+                          )
 ```
 
+Both GLMs result in the same model:
+
+```{r}
+names(gauss_step$model)[-1]
+```
+
+
+# Question 7
+Fit a model using cosso.  COSSO does not have the Poisson or QuasiPoisson response distributions available, so I will use Guassian and transform the response in some of the models.
 ```{r}
 Y <- ragweed$pollenCount
 Y_alt <- log(ragweed$pollenCount)
+Y_alt2 <- sqrt(ragweed$pollenCount)
 X <- ragweed[, c(2, 3, 5, 6, 7)]
+# make sure everything is in 'integer format'
+X$temperatureResidual <- as.integer(X$temperatureResidual)
+X$windSpeed <- as.integer(X$windSpeed)
+str(X)
 ```
 
-```{r}
-cosso_mod <- cosso::cosso(x=X, y=Y_alt, family="Gaussian")
+```{r, message=FALSE, error=T}
+cosso_mod1 <- cosso::cosso(x=X, y=Y, family="Gaussian")
+```
+```{r, message=FALSE, error=T}
+cosso_mod2 <- cosso::cosso(x=X, y=Y_alt, family="Gaussian")
 ```
 
+```{r, message=FALSE, error=T}
+cosso_mod3 <- cosso::cosso(x=X, y=Y_alt2, family="Gaussian")
+```
+
+None of the cosso models were able to run successfully.
