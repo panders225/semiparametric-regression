@@ -372,46 +372,170 @@ print(summary(fitTrainFullGLM))
 ```
 
 ## 7D
+Use a model selection strategy to select a subset of predictors.
+We have quite a few predictors - let's use a convenience function to generate potential predictors in our model.
+
 ```{r}
-test_mod <- mgcv::gam(type ~ make + address
-                      , data=spamTrain
-                      , family=binomial(link="logit")
-                      , select=T
-                        )
-mgcv::summary.gam(test_mod)
+spam_scope <- gam::gam.scope(frame=spamTrain, response=58)
+```
+
+```{r}
+head(spamTrain[, 1:57])
+head(spamTrain[, 58])
+```
+
+```{r, message=FALSE}
+detach("package:mgcv", unload=TRUE)
+```
+
+```{r}
+#spam_init <- gam::gam(type ~ .
+#                       , family=binomial(link="logit")
+#                       , data=spamTrain
+#                       )
+#
+#spam_step <- gam::step.gam(object=spam_init
+#                           , scope=spam_scope
+#                           )
+#
+```
+
+That was taking way too long, and we aren't being asked to include smoothed predictors at this point.  Let's fit this with the LASSO penalization
+```{r}
+library("glmnet")
+```
+
+```{r}
+X=as.matrix(spamTrain[, 1:57])
+y=ifelse(spamTrain[, 58]=="spam", 1, 0)
+
+spam_cv <- glmnet::cv.glmnet(x=X
+                              , y=y
+                              , family="binomial"
+                              , alpha=1
+                              , nfolds=3 # reduce runtime
+                              )
+
+```
+
+```{r}
+(lambda_min <- spam_cv$lambda.min)
+(mod_coefs <- coef(spam_cv, s=lambda_min))
+```
+
+It looks like we need most of the variables, with the exception of a few.  Let's select those out of our design matrix for the upcoming GLM.
+```{r}
+reduced_X <- data.frame(X) %>%
+  dplyr::select(-c(num857, num415, capitalAve))
+```
+
+```{r}
+#test_mod <- mgcv::gam(type ~ make + address
+#                      , data=spamTrain
+#                      , family=binomial(link="logit")
+#                      , select=T
+#                        )
+#mgcv::summary.gam(test_mod)
+```
+
+```{r}
+design_mat <- cbind(reduced_X, y)
+head(design_mat)
 ```
 
 Fit the logistic GLM based on this subset.
 ```{r}
-new_mod <- glm(type ~ make + address
-               , data=spamTrain
-               , family=binomial(link="logit")
-               )
-
+design_mat <- cbind(reduced_X, y)
+new_glm <- stats::glm(y ~ . 
+                      , data=design_mat
+                      , family=binomial(link="logit")
+                      )
+summary(new_glm)
 ```
 
 ## 7E
 Make predictions for the test data classify as spam if prediction probability exceeds 0.5.
 
 ```{r}
-spamTest_preds <- predict.glm(object=new_mod, newdata=spamTest, type="response")
-# spam=2
+spamTest_preds <- predict.glm(object=new_glm, newdata=spamTest, type="response")
+# spam=1 in train, 2 in test
 pre_conf <- data.frame(cbind(spam_fl=spamTest$type
                              , spam_pred=spamTest_preds))
-pre_conf$pred_decision <- ifelse(pre_conf$spam_pred>0.5, 2, 1)
 
+pre_conf$pred_decision <- ifelse(pre_conf$spam_pred>0.5, 2, 1)
+# table for pre-confusion matrix
 conf_table <- table(pre_conf$spam_fl, pre_conf$pred_decision)
-caret::confusionMatrix(conf_table)
+# calculate the misclassification rate
+(sum(conf_table) - (conf_table[1,1] + conf_table[2,2])) / sum(conf_table)
 ```
 
 ## 7F
 Fit the same model as in part E, but fit all terms with smoothing splines.  Apply the same classification criterion.
 
+```{r, message=FALSE}
+library("mgcv")
+```
+
 ```{r}
-refit_mod <- mgcv::gam(type ~ s(make) + s(address)
-                      , data=spamTrain
-                      , family=binomial(link="logit")
-                       )
+refit_mod <- mgcv::gam(
+                      type ~ 
+                        s(make) +
+s(address) +
+s(all) +
+s(num3d) +
+s(our) +
+s(over) 
+#s(remove) +
+#s(internet) +
+#s(order) +
+#s(mail) +
+#s(receive) +
+#s(will) +
+#s(people) +
+#s(report) +
+#s(addresses) +
+#s(free) +
+#s(business) +
+#s(email) +
+#s(you) +
+#s(credit) +
+#s(your) +
+#s(font) +
+#s(num000) +
+#s(money) +
+#s(hp) +
+#s(hpl) +
+#s(george) +
+#s(num650) +
+#s(lab) +
+#s(labs) +
+#s(telnet) +
+#s(data) +
+#s(num85) +
+#s(technology) +
+#s(num1999) +
+#s(parts) +
+#s(pm) +
+#s(direct) +
+#s(cs) +
+#s(meeting) +
+#s(original) +
+#s(project) +
+#s(re) +
+#s(edu) +
+#s(table) +
+#s(conference) +
+#s(charSemicolon) +
+#s(charRoundbracket) +
+#s(charSquarebracket) +
+#s(charExclamation) +
+#s(charDollar) +
+#s(charHash) +
+#s(capitalLong) +
+#s(capitalTotal)
+ , data=spamTrain
+, family=binomial
+)
 ```
 
 ```{r}
@@ -421,8 +545,10 @@ refit_pre_conf <- data.frame(cbind(spam_fl=spamTest$type
                         ))
 refit_pre_conf$pred_decision <- ifelse(refit_pre_conf$spam_pred > 0.5, 2, 1)
 refit_conf_table <- table(refit_pre_conf$spam_fl, refit_pre_conf$pred_decision)
-caret::confusionMatrix(refit_conf_table)
+# capture our misclassification rate
+(sum(refit_conf_table) - (refit_conf_table[1,1] + refit_conf_table[2,2])) / sum(refit_conf_table)
+
 ```
 
-
-
+## 7G
+Based on the above, it appears that the non-smoothed GLM has superior classification accuracy.
