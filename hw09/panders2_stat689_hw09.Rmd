@@ -94,10 +94,11 @@ y_alt <- log(y)
 ```
 
 
-```{r}
+```{r, error=TRUE}
 # attempt a cosso
 cosso_mod <- cosso::cosso(x=X, y=y, family=c("Gaussian"))
 ```
+
 
 ```{r}
 # follow-up on suspicion that lack of normality in response variable distribution may be causing some issues.
@@ -108,21 +109,25 @@ print(shapiro.test(y_alt))
 # y_alt follows normal distribution - retry COSSO model
 ```
 
-```{r}
+```{r, error=TRUE}
 cosso_mod2 <- cosso::cosso(x=X, y=y_alt, family=c("Gaussian"))
 ```
 
 ```{r}
-# maybe the way I've encoded the data is the issue.  Try again
-cosso_mod3 <- cosso::cosso(x=HousePrices[, -1]
-                           , y=HousePrices[, 1]
-                           , family=c("Gaussian")
-                           )
-
+# using the hint from the problem set, try converting the factors to integers using as.integer
+X <- HousePrices[, -1]
+X$driveway <- as.integer(X$driveway)
+X$recreation <- as.integer(X$recreation)
+X$fullbase <- as.integer(X$fullbase)
+X$gasheat <- as.integer(X$gasheat)
+X$aircon <- as.integer(X$aircon)
+X$prefer <- as.integer(X$prefer)
+str(X)
 ```
 
-```{r}
-cosso_mod4 <- cosso::cosso(x=HousePrices[, -1]
+```{r, error=TRUE}
+# now we have our new design matrix - let's transform the response and proceed
+cosso_mod3 <- cosso::cosso(x=X
                            , y=log(HousePrices[, 1])
                            , family=c("Gaussian")
                            )
@@ -131,14 +136,14 @@ cosso_mod4 <- cosso::cosso(x=HousePrices[, -1]
 
 The COSSO package does not seem to be able to solve the matrices we are giving it.  Move on to the stepwise regression.
 
-```{r, message=FALSE}
+```{r, message=FALSE, error=TRUE}
 detach("package:mgcv", unload=TRUE)
 library("gam")
 ```
 
 
 ```{r}
-
+# create the initial model object
 house_init <- gam::gam(price ~ s(lotsize, 27) + bedrooms + factor(bathrooms)
                          + factor(stories) + factor(driveway) + factor(recreation) 
                        + factor(fullbase) 
@@ -169,9 +174,9 @@ house_step <- gam::step.gam(house_init, scope=list(
 
 ```
 
-
 ```{r}
-names(house_step$model)[-1]
+print("Final model Variables are given by: ")
+print(names(house_step$model)[-1])
 ```
 
 From the stepwise output, it appears that we could not have improved the model by taking away any terms - we appear to have selected the correct model from the beginning.  This is perhaps unsurprising - if we examine summary output for the initial model fit, we can see that all of the included terms are highly significant (see below).
@@ -182,7 +187,7 @@ gam::summary.gam(house_init)
 
 
 # Question 5
-## Chapter 3 Question 4
+## Chapter 3 Exercise 4
 ### 4A
 ```{r, message=F}
 library("aplore3")
@@ -193,16 +198,14 @@ data(icu)
 # take a look 
 str(icu)
 ```
-```{r}
-head(icu)
-```
 
 ### 4B
 Select a logistic gam with the response variable being the indicator of a patient dying.
 ```{r}
-# just to make sure nothing gets messed up, recode the live variable
+# just to make sure interpretation doesn't get messed up, recode the live variable
 icu$live <- ifelse(icu$sta=="Lived", 1, 0)
 table(icu$live, icu$sta) # quick check
+
 # initial model object
 icu_init <- gam::gam(live ~ age + gender + race + ser
                        + can + crn + inf 
@@ -240,12 +243,14 @@ icu_step <- gam::step.gam(icu_init, scope=
 The step trace was printed above, but let's take a look to see what the final model is:
 
 ```{r}
+print("ICU data set stepwise model given by: ")
 (step_vars <- names(icu_step$model)[-1])
 ```
 
-### 4C - Use mgcv::gam to re-fit the model selected in part B with GCV used for selction of the smoothing paramters.
-```{r, message=F}
+### 4C - Use mgcv::gam to re-fit the model selected in part B with GCV used for selction of the smoothing paramters.  Include numerical and graphical summaries.
+```{r, message=F, error=TRUE}
 library("mgcv")
+detach("package:gam", unload=TRUE)
 refit_gcv <- mgcv::gam(live ~ race + s(age) + gender + can + cpr + sys + pre + type + 
                          ph + pco + loc
           , data=icu
@@ -256,13 +261,13 @@ refit_gcv <- mgcv::gam(live ~ race + s(age) + gender + can + cpr + sys + pre + t
 
 ```{r}
 mgcv::summary.gam(refit_gcv)
-print("-------")
-print("gam.check output")
-print("-------")
+```
+
+```{r}
 mgcv::gam.check(refit_gcv)
 ```
 
-The model does not appear to be a great fit to the data - the residual histogram suffers from dramatic left-skewness. 
+The model does not appear to be a great fit to the data - the residual histogram suffers from dramatic left-skewness.  The good news, however, is that we have used an adequate number of basis functions in the fitting of our smoothed parameter (see console p-value above).
 
 ### 4D
 Use the refitted GAM model to score a new record with the described characteristics. 
@@ -290,13 +295,15 @@ new_rec <- data.frame(
 )
 # get prediction on the response scale, rather than logit.
 new_rec_pred <- mgcv::predict.gam(refit_gcv, newdata=new_rec, type="response")
+print("Case survival probability given by:")
 print(new_rec_pred)
 ```
 
 # Question 6
 Compare the stepwise and cosso models for Exercise 4 in Chapter 3 
 
-```{r}
+
+```{r, error=TRUE}
 # first, fit a cosso model
 icu_cosso1 <- cosso::cosso(x=icu[3:21]
                             , y=icu$live
@@ -305,15 +312,17 @@ icu_cosso1 <- cosso::cosso(x=icu[3:21]
 ```
 
 ```{r}
-# try out an alternative design matrix.
-X1 <- stats::model.matrix(~-1 + gender + race + ser + can + crn + inf + cpr + pre + type + fra + po2 + ph + pco + bic + cre + loc, data=icu)
+# that didn't work - try out an alternative design matrix.
+# one-hot encode the factors
+X1 <- stats::model.matrix(~ -1 + gender + race + ser + can + crn + inf + cpr + pre + type + fra + po2 + ph + pco + bic + cre + loc, data=icu)
 X2 <- icu %>%
   dplyr::select(age, sys, hra)
 y <- icu$live
 X <- data.frame(cbind(X1, X2))
+str(X)
 ```
 
-```{r}
+```{r, error=TRUE}
 icu_cosso2 <- cosso::cosso(x=X, y=y, family=c("Binomial"))
 ```
 
@@ -384,10 +393,11 @@ head(spamTrain[, 1:57])
 head(spamTrain[, 58])
 ```
 
-```{r, message=FALSE}
+```{r, message=FALSE, error=TRUE}
 detach("package:mgcv", unload=TRUE)
 ```
 
+Run the stepwise regression
 ```{r}
 #spam_init <- gam::gam(type ~ .
 #                       , family=binomial(link="logit")
@@ -400,7 +410,7 @@ detach("package:mgcv", unload=TRUE)
 #
 ```
 
-That was taking way too long, and we aren't being asked to include smoothed predictors at this point.  Let's fit this with the LASSO penalization
+That was taking way too long, and we aren't being asked to include smoothed predictors at this point.  Let's fit this with the LASSO penalization.
 ```{r}
 library("glmnet")
 ```
@@ -408,7 +418,8 @@ library("glmnet")
 ```{r}
 X=as.matrix(spamTrain[, 1:57])
 y=ifelse(spamTrain[, 58]=="spam", 1, 0)
-
+# select optimal constraint via cross validation
+set.seed(1738)
 spam_cv <- glmnet::cv.glmnet(x=X
                               , y=y
                               , family="binomial"
@@ -419,7 +430,9 @@ spam_cv <- glmnet::cv.glmnet(x=X
 ```
 
 ```{r}
+# grab our optimal lambda value
 (lambda_min <- spam_cv$lambda.min)
+# optimal coefficients
 (mod_coefs <- coef(spam_cv, s=lambda_min))
 ```
 
@@ -429,19 +442,6 @@ reduced_X <- data.frame(X) %>%
   dplyr::select(-c(num857, num415, capitalAve))
 ```
 
-```{r}
-#test_mod <- mgcv::gam(type ~ make + address
-#                      , data=spamTrain
-#                      , family=binomial(link="logit")
-#                      , select=T
-#                        )
-#mgcv::summary.gam(test_mod)
-```
-
-```{r}
-design_mat <- cbind(reduced_X, y)
-head(design_mat)
-```
 
 Fit the logistic GLM based on this subset.
 ```{r}
@@ -472,67 +472,69 @@ conf_table <- table(pre_conf$spam_fl, pre_conf$pred_decision)
 ## 7F
 Fit the same model as in part E, but fit all terms with smoothing splines.  Apply the same classification criterion.
 
-```{r, message=FALSE}
+```{r, message=FALSE, error=TRUE}
 library("mgcv")
 ```
 
 ```{r}
-refit_mod <- mgcv::gam(
+# mgcv::gam is taking a while, so I am going to try out mgcv::bam, 
+# which is for larger data sets
+refit_mod <- mgcv::bam(
                       type ~ 
                         s(make) +
 s(address) +
 s(all) +
 s(num3d) +
 s(our) +
-s(over) 
-#s(remove) +
-#s(internet) +
-#s(order) +
-#s(mail) +
-#s(receive) +
-#s(will) +
-#s(people) +
-#s(report) +
-#s(addresses) +
-#s(free) +
-#s(business) +
-#s(email) +
-#s(you) +
-#s(credit) +
-#s(your) +
-#s(font) +
-#s(num000) +
-#s(money) +
-#s(hp) +
-#s(hpl) +
-#s(george) +
-#s(num650) +
-#s(lab) +
-#s(labs) +
-#s(telnet) +
-#s(data) +
-#s(num85) +
-#s(technology) +
-#s(num1999) +
-#s(parts) +
-#s(pm) +
-#s(direct) +
-#s(cs) +
-#s(meeting) +
-#s(original) +
-#s(project) +
-#s(re) +
-#s(edu) +
-#s(table) +
-#s(conference) +
-#s(charSemicolon) +
-#s(charRoundbracket) +
-#s(charSquarebracket) +
-#s(charExclamation) +
-#s(charDollar) +
-#s(charHash) +
-#s(capitalLong) +
-#s(capitalTotal)
+s(over) +
+s(remove) +
+s(internet) +
+s(order) +
+s(mail) +
+s(receive) +
+s(will) +
+s(people) +
+s(report) +
+s(addresses) +
+s(free) +
+s(business) +
+s(email) +
+s(you) +
+s(credit) +
+s(your) +
+s(font) +
+s(num000) +
+s(money) +
+s(hp) +
+s(hpl) +
+s(george) +
+s(num650) +
+s(lab) +
+s(labs) +
+s(telnet) +
+s(data) +
+s(num85) +
+s(technology) +
+s(num1999) +
+s(parts) +
+s(pm) +
+s(direct) +
+s(cs) +
+s(meeting) +
+s(original) +
+s(project) +
+s(re) +
+s(edu) +
+s(table) +
+s(conference) +
+s(charSemicolon) +
+s(charRoundbracket) +
+s(charSquarebracket) +
+s(charExclamation) +
+s(charDollar) +
+s(charHash) +
+s(capitalLong) +
+s(capitalTotal)
  , data=spamTrain
 , family=binomial
 )

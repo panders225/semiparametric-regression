@@ -1,0 +1,206 @@
+---
+title: "Assignment 11; STAT 689"
+author: "Philip Anderson; panders2@tamu.edu"
+date: "4/02/2018"
+output: pdf_document
+---
+
+```{r, message=FALSE}
+library("HRW")
+library("mgcv")
+library("cosso")
+library("tidyverse")
+```
+
+# Question 1
+
+```{r}
+data("BostonMortgages")
+```
+
+```{r}
+str(BostonMortgages)
+```
+
+## 1A
+Which model does Cosso select?
+
+```{r}
+# create a 1/0 indicator for deny so we know what the procedures are predicting
+BostonMortgages$deny_bin <- ifelse(BostonMortgages$deny=="yes", 1, 0)
+# evaluate results with contingency table
+table(BostonMortgages$deny_bin, BostonMortgages$deny)
+```
+
+```{r}
+# generate design matrix
+# column 5 has a huge outlier - drop it
+BostonMortgages_red <- BostonMortgages %>%
+  dplyr::filter(dir < 1)
+
+# one-hot-encode the factor variables and drop the intercept this function makes
+fac_to_int <- stats::model.matrix(~ black + pbcr + self + single, BostonMortgages_red)[, -1] %>%
+  data.frame()
+int_vars <- BostonMortgages_red[, c("dir", "lvr")]
+X <- as.matrix(cbind(fac_to_int, int_vars))
+
+# generate response array
+y <- BostonMortgages_red[, c("deny_bin")]
+```
+
+
+```{r}
+start <- Sys.time()
+cosso_mod <- cosso::cosso(x=X, y=y, family=c("Binomial"))
+end <- Sys.time()
+# runtime
+print(end - start)
+```
+```{r}
+head(X)
+```
+
+```{r}
+tune_matrix <- data.frame(cosso_mod$tune$Mgrid
+                  , cosso_mod$tune$L2norm
+                )
+names(tune_matrix) <- c("M","blackyes", "pbcryes", "selfyes", "singleyes", "dir", "lvr")
+print(round(tune_matrix, 2))
+```
+
+```{r}
+start <- Sys.time()
+tune_mod <- cosso::tune.cosso(cosso_mod, 4, FALSE)
+fin <- Sys.time()
+print(fin - start)
+```
+
+```{r}
+cosso::plot.cosso(cosso_mod, M=tune_mod$OptM)
+```
+
+```{r}
+tune_matrix %>% 
+  dplyr::filter(M==tune_mod$OptM) %>%
+  print()
+```
+
+The only variable selected for our model is _dir_. 
+
+## 1B
+Which model does mgcv select?
+
+I am going to begin by throwing a great deal of information into the model, using _deny_ as the outcome of interest.
+
+
+```{r}
+# use an equivalent model to the one above - continue using the Boston Mortgages dataset
+mgcv_mod <- mgcv::gam(deny_bin ~ black + pbcr + self + single + dir + lvr
+                      , data=BostonMortgages_red
+                      , family=binomial(link="logit")
+                      , select=T
+                      )
+mgcv::summary.gam(mgcv_mod)
+```
+
+The mgcv procedure selected all of the variables that we put into the model.
+
+## 1C
+The variables selected are not close.  Reconciliation between the opposed results would require fairly extensive troubleshooting that will not be performed here.
+
+# Question 2
+
+```{r}
+data("femSBMD")
+names(femSBMD) <- tolower(names(femSBMD))
+str(femSBMD)
+```
+## 2A
+Define a new identification variable, given as 2 times the existing identification variable.
+
+```{r}
+femSBMD$idnum2 <- 2*femSBMD$idnum
+str(femSBMD)
+```
+
+## 2B
+Rerun the gamm model given in class, using the original idnum variable and the new one.  Ensure that we are getting the same results with each.
+
+```{r}
+# original fit
+class_fit <- mgcv::gamm(spnbmd ~ s(age) + black + hispanic + white
+                        , random=list(idnum = ~1)
+                        , data=femSBMD
+                         )
+# new fit 
+hw_fit <- mgcv::gamm(spnbmd ~ s(age) + black + hispanic + white
+                        , random=list(idnum2 = ~1)
+                        , data=femSBMD
+                         )
+```
+
+```{r}
+# print the original results
+summary(class_fit$gam)
+```
+
+```{r}
+# print out the updated results
+summary(hw_fit$gam)
+```
+
+The specific number of the id number variable does not appear to matter in the gamm function's grouping of observations.
+
+
+
+# Question 3
+```{r}
+(version_info <- version)
+
+version_num <- paste0(version_info$major, ".", version_info$minor)
+cat("\n")
+print(paste0("version num: ", version_num))
+```
+
+```{r}
+library("rstan")
+```
+
+RStan has loaded successfully.
+
+
+# Question 4
+
+```{r}
+pig.weights <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/hw11/pigWeights.csv")
+names(pig.weights) <- tolower(names(pig.weights))
+str(pig.weights)
+```
+
+```{r, message=F}
+library("lattice")
+```
+
+```{r}
+lattice::xyplot(weight~num.weeks
+                , data=pig.weights
+                , groups=id.num
+                , type="b"
+                 )
+```
+
+## 4B
+Looking at the data, it appears that a random-intercept model holds for these data.  Note that the slope of each pig's data appears to be the same, and they tend to end up where they started.
+
+## 4C
+Fit the random-intercept model and give your code.  Also, do a summary and show your results.
+
+```{r}
+random_int <- mgcv::gamm(weight ~ num.weeks
+                         , random=list(id.num = ~1)
+                         , data=pig.weights
+                         )
+summary(random_int$gam)
+```
+
+

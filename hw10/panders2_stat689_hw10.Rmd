@@ -1,7 +1,7 @@
 ---
 title: "Assignment10; STAT 689"
 author: "Philip Anderson; panders2@tamu.edu"
-date: "3/21/2018"
+date: "3/26/2018"
 output: pdf_document
 ---
 
@@ -28,7 +28,7 @@ fit1 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27, by=factor(ye
 Obtain residual plots for the models.
 ```{r}
 mgcv::gam.check(fit1)
-qqnorm(residuals(fit1, type="scaled.pearson"), main="Second QQ-Plot")
+qqnorm(residuals(fit1, type="scaled.pearson"), main="Poisson Fit: Second QQ-Plot")
 abline(0, 1, col="red")
 ```
 
@@ -40,6 +40,7 @@ Obtain alternative fits.
 fit2 <- mgcv::gam(pollenCount ~ factor(year) + s(dayInSeason, k=27, by=factor(year))
                   + temperatureResidual + rain + s(windSpeed, k=27) 
                  , data=ragweed
+                 , scale=-1
                  , family=quasipoisson
                    )
 
@@ -112,17 +113,27 @@ par(mfrow=c(1,1))
 
 For the square root transformation (fit3), see whether the idea of constant variance is reasonable.
 ```{r}
-resid <- abs(residuals(fit3))
-fitted <- fitted(fit3)
-plot(fitted, resid
+# obtain the absolute residuals and the fitted values
+abs_res <- abs(residuals(fit3))
+fit_vals <- fitted(fit3)
+# fit a new smoothed regression
+resid_mod <- mgcv::gam(abs_res ~ s(fit_vals))
+# initial plot
+plot(fit_vals, abs_res
      , main="Fitted Values vs. Absolute Residuals - Fit 3"
      , xlab="Fitted Values"
      , ylab="Abs. Residuals"
      )
-
+ord <- order(fitted(fit3))
+# plot the line over the data
+lines(fit_vals[ord], fitted(resid_mod)[ord], lwd=3)
 ```
 
-From the above plot, it does not appear that the assumption of constant variance is reasonable.  As our fitted values increase, the variance of our absolute residuals increases.  
+```{r}
+max(fitted(resid_mod)) /  min(fitted(resid_mod))
+```
+
+From the above plot, it does not appear that the assumption of constant variance is reasonable.  As our fitted values increase, the variance of our absolute residuals increases.  Also our fitted value ratio heuristic shows that we have evidence of heteroscedacticity.  
 
 # Question 3
 From the estimated scale in the QuasiPoisson model, does the scale parameter imply that we may have concern about overdispersion?
@@ -173,24 +184,7 @@ detach("package:mgcv", unload=TRUE)
 library("gam")
 ```
 
-For the following, the quasipoisson response distribution appears to be incompatible with the step.gam function.  I use poisson and gaussian response distributions for model selection.
-```{r}
-pois_init <- gam::gam(pollenCount ~ factor(year) + dayInSeason
-                  + temperatureResidual + rain + windSpeed
-                 , data=ragweed
-                 , family=poisson(link="log")
-                   )
-
-
-pois_step <- gam::step.gam(pois_init, scope=list(
-                        "year" = ~1 + year
-                        , "dayInSeason" = ~1 + dayInSeason + s(dayInSeason, 2)
-                        , "temperatureResidual" = ~1 + temperatureResidual 
-                        , "rain" = ~1 + rain
-                        , "windSpeed" = ~1 + windSpeed + s(windSpeed, 2)
-                        )
-                          )
-```
+For the following, the quasipoisson response distribution appears to be incompatible with the step.gam function.  I will use the gaussian response distribution for model selection.
 
 ```{r}
 gauss_init <- gam::gam(sqrt(pollenCount) ~ factor(year) + dayInSeason
@@ -210,10 +204,10 @@ gauss_step <- gam::step.gam(gauss_init, scope=list(
                           )
 ```
 
-Both GLMs result in the same model:
+The above GLM results in the following model:
 
 ```{r}
-names(gauss_step$model)[-1]
+print(names(gauss_step$model)[-1])
 ```
 
 
