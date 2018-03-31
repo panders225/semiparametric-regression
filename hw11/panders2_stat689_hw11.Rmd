@@ -28,39 +28,40 @@ Which model does Cosso select?
 ```{r}
 # create a 1/0 indicator for deny so we know what the procedures are predicting
 BostonMortgages$deny_bin <- ifelse(BostonMortgages$deny=="yes", 1, 0)
-# evaluate results with contingency table
+# corroborate results with contingency table
 table(BostonMortgages$deny_bin, BostonMortgages$deny)
 ```
 
 ```{r}
 # generate design matrix
-# column 5 has a huge outlier - drop it
+# column 5 has a huge outlier - drop it so that cosso will run
 BostonMortgages_red <- BostonMortgages %>%
   dplyr::filter(dir < 1)
 
-# one-hot-encode the factor variables and drop the intercept this function makes
+# one-hot-encode the factor variables, dropping the intercept this function makes along the way
 fac_to_int <- stats::model.matrix(~ black + pbcr + self + single, BostonMortgages_red)[, -1] %>%
   data.frame()
+# grab the non-factor variables
 int_vars <- BostonMortgages_red[, c("dir", "lvr")]
+# bring everything together
 X <- as.matrix(cbind(fac_to_int, int_vars))
 
-# generate response array
+# generate response array with custom response variable
 y <- BostonMortgages_red[, c("deny_bin")]
 ```
 
 
 ```{r}
+# run the cosso model
 start <- Sys.time()
 cosso_mod <- cosso::cosso(x=X, y=y, family=c("Binomial"))
 end <- Sys.time()
 # runtime
 print(end - start)
 ```
-```{r}
-head(X)
-```
 
 ```{r}
+# we will want to see how our coefficients jointly change with various tuning parameters 
 tune_matrix <- data.frame(cosso_mod$tune$Mgrid
                   , cosso_mod$tune$L2norm
                 )
@@ -69,36 +70,46 @@ print(round(tune_matrix, 2))
 ```
 
 ```{r}
+# we will now want to select an optimal tuning paramter
 start <- Sys.time()
-tune_mod <- cosso::tune.cosso(cosso_mod, 4, FALSE)
+set.seed(1738)
+tune_mod <- cosso::tune.cosso(cosso_mod, 10, FALSE)
 fin <- Sys.time()
 print(fin - start)
 ```
 
 ```{r}
+# print out the regularization trace
+print(tune_mod$OptM)
 cosso::plot.cosso(cosso_mod, M=tune_mod$OptM)
 ```
 
 ```{r}
+# determine what our coefficients for this model will be based on our tuning matrix
 tune_matrix %>% 
   dplyr::filter(M==tune_mod$OptM) %>%
   print()
 ```
 
-The only variable selected for our model is _dir_. 
+Cosso selects _black_, _pbcr_, _dir_, and _lvr_ for our model.
 
 ## 1B
 Which model does mgcv select?
 
-I am going to begin by throwing a great deal of information into the model, using _deny_ as the outcome of interest.
-
+I am going to use the exact same data set generated for the cosso problem, but moved from matrix form in to a data frame.  Note that this means I am going to keep the outlier removed. 
 
 ```{r}
-# use an equivalent model to the one above - continue using the Boston Mortgages dataset
-mgcv_mod <- mgcv::gam(deny_bin ~ black + pbcr + self + single + dir + lvr
-                      , data=BostonMortgages_red
+boston_df <- data.frame(cbind(y, X))
+# rename our response
+names(boston_df)[1] <- "deny_bin"
+head(boston_df)
+```
+
+```{r}
+mgcv_mod <- mgcv::gam(deny_bin ~ blackyes + pbcryes + selfyes + singleyes + dir + lvr
+                      , data=boston_df
                       , family=binomial(link="logit")
-                      , select=T
+                      , select=TRUE
                       )
 mgcv::summary.gam(mgcv_mod)
 ```
@@ -106,7 +117,7 @@ mgcv::summary.gam(mgcv_mod)
 The mgcv procedure selected all of the variables that we put into the model.
 
 ## 1C
-The variables selected are not close.  Reconciliation between the opposed results would require fairly extensive troubleshooting that will not be performed here.
+The variables selected by both models are relatively close, but not exact.  Given past experiences with both packages, I am more readily inclined to trust mgcv over cosso.
 
 # Question 2
 
@@ -124,12 +135,12 @@ str(femSBMD)
 ```
 
 ## 2B
-Rerun the gamm model given in class, using the original idnum variable and the new one.  Ensure that we are getting the same results with each.
+Rerun the gamm given in class, using first the original idnum variable and then the new one.  Ensure that we are getting the same results with each.
 
 ```{r}
 # original fit
 class_fit <- mgcv::gamm(spnbmd ~ s(age) + black + hispanic + white
-                        , random=list(idnum = ~1)
+                        , random=list(idnum = ~1) # intercept allowed to vary randomly
                         , data=femSBMD
                          )
 # new fit 
@@ -152,8 +163,8 @@ summary(hw_fit$gam)
 The specific number of the id number variable does not appear to matter in the gamm function's grouping of observations.
 
 
-
 # Question 3
+## 3A
 ```{r}
 (version_info <- version)
 
@@ -162,6 +173,7 @@ cat("\n")
 print(paste0("version num: ", version_num))
 ```
 
+## 3C
 ```{r}
 library("rstan")
 ```
@@ -181,16 +193,19 @@ str(pig.weights)
 library("lattice")
 ```
 
+## 4A
+Display the lattice plot of the pig data.
 ```{r}
 lattice::xyplot(weight~num.weeks
                 , data=pig.weights
                 , groups=id.num
                 , type="b"
+                , main="Pig Data"
                  )
 ```
 
 ## 4B
-Looking at the data, it appears that a random-intercept model holds for these data.  Note that the slope of each pig's data appears to be the same, and they tend to end up where they started.
+Looking at the data, it appears that a random-intercept model holds for these data.  Note that the slope of each pig's data appears to be the same - the main difference between the lines tends to be the point where they started.
 
 ## 4C
 Fit the random-intercept model and give your code.  Also, do a summary and show your results.
@@ -200,7 +215,17 @@ random_int <- mgcv::gamm(weight ~ num.weeks
                          , random=list(id.num = ~1)
                          , data=pig.weights
                          )
+# first grab the model coefficients
 summary(random_int$gam)
 ```
+
+```{r}
+# now grab confidence interval information
+intervals(random_int$lme)
+```
+
+The between-person (intercept) variance is captured by the 95% interval given by (3.13, 4.73), which does not contain zero and is thus significant.
+The within-person (random error) variance is captured by the 95% interval given by (1.95, 2.25), which also does not contain zero and is thus significant. 
+
 
 
