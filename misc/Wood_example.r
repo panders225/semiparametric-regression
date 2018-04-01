@@ -5,15 +5,15 @@
 ###########################################################
 # Clear the workspace. I do this every time
 ###########################################################
-rm(list = ls())
+#rm(list = ls())
 ###########################################################
 # Set the seed. I also do this every time
 ###########################################################
-set.seed(4428967)
+#set.seed(4428967)
 ###########################################################
 # Set the working directory. 
 ###########################################################
-setwd("C:\\Users\\Carroll\\Documents\\My_Documents\\2018_SemiPar\\Data_Sets\\Cox_Regression")
+#setwd("C:\\Users\\Carroll\\Documents\\My_Documents\\2018_SemiPar\\Data_Sets\\Cox_Regression")
 ###########################################################
 # Load the libraries
 ###########################################################
@@ -25,10 +25,12 @@ library(mgcv)
 # = 1 for an event, = 0 for censored
 ###########################################################
 data(pbc)
+
 names(pbc)
 pbc$status1 = as.numeric(pbc$status==2)
 cat('The sample size = ',length(pbc$age),"\n")
 cat('The number of uncensored subjects = ',sum(pbc$status1),"\n")
+head(pbc)
 ###########################################################
 # Run a simple Cox model on all the variables
 ###########################################################
@@ -97,3 +99,5 @@ lines(newd$time,exp(log(fv$fit)-2*se),col="red4",lwd=2)
 #           s(age)+s(bili)+s(albumin)+s(sqrt(ast))+s(alk.phos),
 #         weights=status1,family=cox.ph,data=pbc,select=TRUE)
 # summary(bselect)
+
+

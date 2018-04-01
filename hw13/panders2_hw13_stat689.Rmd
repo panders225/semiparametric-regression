@@ -1,0 +1,124 @@
+---
+title: "Assignment 13; STAT 689"
+author: "Philip Anderson; panders2@tamu.edu"
+date: "4/11/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library("mgcv")
+```
+
+
+```{r}
+colon <- read.csv('/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/colon_cancer.csv')
+names(colon) <- tolower(names(colon))
+str(colon)
+```
+
+# Question 1
+What percentage of the sample died?
+```{r}
+table(colon$colon_cc)
+table(colon$colon_cc) / nrow(colon)
+```
+50% of the sample died from colon cancer.
+
+# Question 2
+Run a Cox regression with age and BMI entering linearly; show output and code.
+
+```{r}
+# mgcv expects the weights parameter to hold the censoring info.  0 for censored, 1 for event
+cox_mod <- mgcv::gam(personyrs ~ age + bmi
+                     , weights=colon_cc
+                     , data=colon
+                     , family="cox.ph"
+                     )
+summary(cox_mod)
+```
+
+# Question 3
+Describe the results from the above regression.
+
+Both terms in the model, _age_ and _bmi_, are statistically significant.  Each term is positively associated with the response, time since diagnosis with colon cancer.
+
+# Question 4
+Run a Cox regression with _age_ and _bmi_ entering as smooth terms.
+```{r}
+cox_mod_two <- mgcv::gam(personyrs ~ s(age) + s(bmi)
+                         , weights=colon_cc
+                         , data=colon
+                         , family="cox.ph"
+                         )
+mgcv::summary.gam(cox_mod_two)
+```
+
+# Question 5
+What is statistically significant?
+
+As before, both terms appear to be statistically significant.
+
+# Question 6
+Try to compare the models using your favorite method.
+
+```{r}
+anova(cox_mod, cox_mod_two, test="Chisq")
+```
+
+It appears that smoothing the terms is necessary.
+
+# Question 7
+Plot the smooths, their pointwise CI's, and the Cox residuals.
+
+```{r}
+# plot the smoothed terms first
+mgcv::plot.gam(cox_mod_two, shade=T, shade.col='dodger blue')
+```
+
+```{r}
+# plot the Cox residuals
+plot(cox_mod_two$linear.predictors, residuals(cox_mod_two)
+     , main="Plot of Cox Residuals"
+     )
+```
+
+# Question 8
+Do the Cox residuals look something like the Simon Wood data?
+
+Not especially.  It looks like we have distinct patterns in our residual plots, and may need to look for additional predictors.
+
+# Question 9
+Pick any four people and plot their survivial curves and pointwise confidence intervals.
+
+It will be easiest to write a function for this that adapts the Simon Wood code to generalize somewhat.
+```{r}
+survival_plotter <- function(subjectnum=1, np=300, dset, mod){
+                        newd <- data.frame(matrix(0, np, 0))
+                        for (n in names(dset))
+                          newd[[n]] <- rep(dset[[n]][subjectnum], np)
+                        
+                        newd$personyrs <- seq(0, 12, length=np)
+                        
+                        fv <- predict(mod, newdata=newd, type="response", se=TRUE)
+                        
+                        plot(newd$personyrs, fv$fit, type="l", lwd=2
+                             , xlim=c(0, 12), ylim=c(0, 1)
+                             , xlab="personyrs", ylab="survival probability"
+                             , main = substitute(paste("Subject = ",m),list(m = subjectnum))
+                        )
+                        
+                        se <- fv$se.fit / fv$fit
+                        lines(newd$personyrs, exp(log(fv$fit)+2*se), col="red4", lwd=2)
+                        lines(newd$personyrs, exp(log(fv$fit)-2*se), col="red4", lwd=2)
+                        }
+```
+
+```{r}
+# pick random people to plot
+set.seed(1738)
+cases <- ceiling(runif(4, 0, nrow(colon)))
+for (i in 1:length(cases))
+  survival_plotter(subjectnum=cases[i], np=300, dset=colon, mod=cox_mod_two)
+```
+
+
