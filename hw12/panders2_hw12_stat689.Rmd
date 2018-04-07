@@ -1,11 +1,13 @@
 ---
 title: "Assignment 12; STAT 689"
 author: "Philip Anderson; panders2@tamu.edu"
-date: "4/5/2018"
+date: "4/10/2018"
 output: pdf_document
 ---
 
 ```{r, message=F}
+# preliminaries
+rm(list=ls())
 library("HRW")
 library("mgcv")
 library("nlme")
@@ -28,76 +30,80 @@ cat('Distinct pigs in the data given by: ', length(unique(pigs$id.num)))
 ```
 
 ## 1B
-Fit the random function model and display your code.  I am going to model pig weight as a function of the number of weeks since measurement on the pigs began.
+Fit the random function model and display your code.  
+I am going to model pig weight as a function of the number of weeks since measurement on the pigs began.
 
 ```{r}
 # extract the important variables into individual objects
-id_num <- pigs$id.num
-num_weeks <- pigs$num.weeks
-pig_weight <- pigs$weight
+id_num_a <- pigs$id.num
+num_weeks_a <- pigs$num.weeks
+pig_weight_a <- pigs$weight
 ```
 
-Now, we need to set up the design matrices for the splines at the population (global) level and individual (group) level.  Note that the individual level will have fewer knots than the population level.  We will need to follow this with a random effects structure.  There is a lot of code here that will be reused later, so I am going to package this up into a function - note that it won't be generalizable beyond this specific situation.
+Now, we need to set up the design matrices for the splines at the population (global) level and individual (group) level.  Note that the individual level will have fewer knots than the population level.  We will follow this with a random effects structure, generated below.  There is a lot of code here that will be reused later, so I am going to package this up into a function - note that it won't be generalizable beyond this specific situation.
 
 
 ```{r}
 random_func_mod <- function(id_num, num_weeks, pig_weight) {
   
-      # number records
-      numObs <- length(id_num)
-      # number of subjects
-      numGrp <- length(unique(id_num))
+      # a lot of these objects get used down the road, so I am going to use global assignment
       
-      ## population (Gbl) work
+      # number of records
+      numObs <<- length(id_num)
+      
+      # number of subjects
+      numGrp <<- length(unique(id_num))
+      
+      # population (Gbl) work
       # knots
-      numIntKnotsGbl <- 20
+      numIntKnotsGbl <<- 20
       # population O-Sull Basis Functions 
-      intKnotsGbl <- quantile(unique(num_weeks)
+      intKnotsGbl <<- quantile(unique(num_weeks)
                               , seq(0, 1, length=numIntKnotsGbl+2)
                               )[-c(1, numIntKnotsGbl+2)]
-      range.num_weeks <- c(min(num_weeks)-0.01, max(num_weeks)+0.01)
+      range.num_weeks <<- c(min(num_weeks)-0.01, max(num_weeks)+0.01)
       
-      Zgbl <- HRW::ZOSull(num_weeks, range.x=range.num_weeks, intKnots=intKnotsGbl)
+      Zgbl <<- HRW::ZOSull(num_weeks, range.x=range.num_weeks, intKnots=intKnotsGbl)
       
-      ## subject-level (Grp) work
-      numIntKnotsGrp <- 10
-      intKnotsGrp <- quantile(unique(num_weeks)
+      # subject-level (Grp) work
+      numIntKnotsGrp <<- 10
+      intKnotsGrp <<- quantile(unique(num_weeks)
                               , seq(0, 1, length=numIntKnotsGrp+2)
                               )[-c(1, numIntKnotsGrp+2)]
-      Zgrp <- HRW::ZOSull(num_weeks, range.x=range.num_weeks, intKnots=intKnotsGrp)
+      Zgrp <<- HRW::ZOSull(num_weeks, range.x=range.num_weeks, intKnots=intKnotsGrp)
       
       
       #Now, set up the random effects structure.
-      dummyId <- factor(rep(1, numObs))
-      Zblock <- list(
+      dummyId <<- factor(rep(1, numObs))
+      Zblock <<- list(
                     dummyId = pdIdent( ~ -1 + Zgbl) 
                     , id_num = pdSymm(~ num_weeks)
                     , id_num = pdIdent(~ -1 + Zgrp)
                     )
-      gd <- groupedData(pig_weight ~ num_weeks|rep(1, length=numObs)
+      gd <<- groupedData(pig_weight ~ num_weeks|rep(1, length=numObs)
                         , data=data.frame(pig_weight, num_weeks, Zgbl, Zgrp, id_num)
                         )
-      fit <- lme(pig_weight ~ num_weeks, data=gd, random=Zblock)
+      fit <<- lme(pig_weight ~ num_weeks, data=gd, random=Zblock)
       
       return(fit)
+      
 }
 
 
 ```
 
 ```{r}
-fit <- random_func_mod(id_num=id_num, num_weeks=num_weeks, pig_weight=pig_weight)
-
+fit <- random_func_mod(id_num=id_num_a, num_weeks=num_weeks_a, pig_weight=pig_weight_a)
 ```
 
-Display the summary statistics that are mentioned in Lecture 18.
+Display the summary.
 
 ```{r}
 summary(fit)
 ```
 
 # Question 2
-Plot the population-level BLUP estimates.
+Plot the population-level BLUP estimates.  First, we need to work through a number of preliminaries.
 
 ```{r}
 # number of grid points
@@ -134,7 +140,7 @@ for (i in 1:numGrp)
 
 ```
 
-
+Now do the population-level plot.
 ```{r}
 plot(num_weeks_g, fHatg, type="l", col="dodgerblue4", lwd=3
      , xlab="Number of Weeks" 
@@ -142,6 +148,7 @@ plot(num_weeks_g, fHatg, type="l", col="dodgerblue4", lwd=3
      , main="Pig Weight by Number of Weeks - Population Curve"
      )
 ```
+Overall, this plot looks very linear.
 
 # Question 3
 Plot the individual BLUP estimates for the first 28 pigs.
@@ -164,7 +171,7 @@ figure <- xyplot(pig_weight_28 ~ num_weeks_28 | id_num_28
                  , xlab=list("age (years)", cex=1.5)
                  , ylab=list("height (centimeters)", cex=1.5)
                  , as.table=T
-                 , main="Pig Weight for first 28 Pigs"
+                 , main="Pig Weight for n=1:28"
 #                 , layout=c(4,7)
                  , panel=function(x, y, subscripts, groups)
                      {
@@ -182,11 +189,11 @@ figure
 
 ```
 
+
 # Question 4
 Rerun problem 1 for separate time periods, first weeks 1-5, and then for weeks 6-9.
 
 ```{r}
-pigs <- read.csv('/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/hw11/pigWeights.csv')
 # first split out the data
 pigs_epoch_1 <- pigs %>%
   dplyr::filter(num.weeks < 6)
@@ -197,129 +204,39 @@ pigs_epoch_2 <- pigs %>%
 
 First, weeks 1-5.
 ```{r}
-id_num <- pigs_epoch_1$id.num
-num_weeks <- pigs_epoch_1$num.weeks
-pig_weight <- pigs_epoch_1$weight
+id_num_1 <- pigs_epoch_1$id.num
+num_weeks_1 <- pigs_epoch_1$num.weeks
+pig_weight_1 <- pigs_epoch_1$weight
 
-fit_epoch_1 <- random_func_mod(id_num=id_num, num_weeks=num_weeks, pig_weight=pig_weight)
+fit_epoch_1 <- random_func_mod(id_num=id_num_1, num_weeks=num_weeks_1, pig_weight=pig_weight_1)
 ```
 
 
 Now, weeks 6-9.
 ```{r}
-id_num <- pigs_epoch_2$id.num
-num_weeks <- pigs_epoch_2$num.weeks
-pig_weight <- pigs_epoch_2$weight
+id_num_2 <- pigs_epoch_2$id.num
+num_weeks_2 <- pigs_epoch_2$num.weeks
+pig_weight_2 <- pigs_epoch_2$weight
 
-fit_epoch_2 <- random_func_mod(id_num=id_num, num_weeks=num_weeks, pig_weight=pig_weight)
+fit_epoch_2 <- random_func_mod(id_num=id_num_2, num_weeks=num_weeks_2, pig_weight=pig_weight_2)
+```
+
+Print General Summaries of each fit.
+```{r}
+summary(fit_epoch_1)
 ```
 
 ```{r}
-stop('stop')
+summary(fit_epoch_2)
 ```
 
-I am going to work with the first time period first.  Because a lot of this code is recycled from above, I will have reduced comments.
+Looking specifically at the between-subject variability for these time periods:
 
 ```{r}
-# extract meaningful variables into objects
-id_num <- pigs_epoch_1$id.num
-num_weeks <- pigs_epoch_1$num.weeks
-pig_weight <- pigs_epoch_1$weight
+print("Weeks 1-5 between-subject variability")
+print(fit_epoch_1$modelStruct$reStruct[3])
+print("Weeks 6-9 between-subject variability")
+print(fit_epoch_2$modelStruct$reStruct[3])
 ```
 
-```{r}
-# set up our design matrices.
-# number records
-numObs <- length(id_num)
-# number of subjects
-numGrp <- length(unique(id_num))
-
-## population (Gbl) work
-# knots
-numIntKnotsGbl <- 20
-# population O-Sull Basis Functions 
-intKnotsGbl <- quantile(unique(num_weeks)
-                        , seq(0, 1, length=numIntKnotsGbl+2)
-                        )[-c(1, numIntKnotsGbl+2)]
-range.num_weeks <- c(min(num_weeks)-0.01, max(num_weeks)+0.01)
-
-Zgbl <- HRW::ZOSull(num_weeks, range.x=range.num_weeks, intKnots=intKnotsGbl)
-
-## subject-level (Grp) work
-numIntKnotsGrp <- 10
-intKnotsGrp <- quantile(unique(num_weeks)
-                        , seq(0, 1, length=numIntKnotsGrp+2)
-                        )[-c(1, numIntKnotsGrp+2)]
-Zgrp <- HRW::ZOSull(num_weeks, range.x=range.num_weeks, intKnots=intKnotsGrp)
-```
-
-```{r}
-# random effects structure
-dummyId <- factor(rep(1, numObs))
-Zblock <- list(
-              dummyId = pdIdent( ~ -1 + Zgbl) 
-              , id_num = pdSymm(~ num_weeks)
-              , id_num = pdIdent(~ -1 + Zgrp)
-              )
-gd <- groupedData(pig_weight ~ num_weeks|rep(1, length=numObs)
-                  , data=data.frame(pig_weight, num_weeks, Zgbl, Zgrp, id_num)
-                  )
-fit_epoch_1 <- lme(pig_weight ~ num_weeks, data=gd, random=Zblock)
-```
-
-Now going to work with the second period.
-
-
-```{r}
-# extract meaningful variables into objects
-id_num <- pigs_epoch_2$id.num
-num_weeks <- pigs_epoch_2$num.weeks
-pig_weight <- pigs_epoch_2$weight
-```
-
-```{r}
-# set up our design matrices.
-# number records
-numObs <- length(id_num)
-# number of subjects
-numGrp <- length(unique(id_num))
-
-## population (Gbl) work
-# knots
-numIntKnotsGbl <- 20
-# population O-Sull Basis Functions 
-intKnotsGbl <- quantile(unique(num_weeks)
-                        , seq(0, 1, length=numIntKnotsGbl+2)
-                        )[-c(1, numIntKnotsGbl+2)]
-range.num_weeks <- c(min(num_weeks)-0.01, max(num_weeks)+0.01)
-
-Zgbl <- HRW::ZOSull(num_weeks, range.x=range.num_weeks, intKnots=intKnotsGbl)
-
-## subject-level (Grp) work
-numIntKnotsGrp <- 10
-intKnotsGrp <- quantile(unique(num_weeks)
-                        , seq(0, 1, length=numIntKnotsGrp+2)
-                        )[-c(1, numIntKnotsGrp+2)]
-Zgrp <- HRW::ZOSull(num_weeks, range.x=range.num_weeks, intKnots=intKnotsGrp)
-```
-
-```{r}
-# random effects structure
-dummyId <- factor(rep(1, numObs))
-Zblock <- list(
-              dummyId = pdIdent( ~ -1 + Zgbl) 
-              , id_num = pdSymm(~ num_weeks)
-              , id_num = pdIdent(~ -1 + Zgrp)
-              )
-gd <- groupedData(pig_weight ~ num_weeks|rep(1, length=numObs)
-                  , data=data.frame(pig_weight, num_weeks, Zgbl, Zgrp, id_num)
-                  )
-fit_epoch_2 <- lme(pig_weight ~ num_weeks, data=gd, random=Zblock)
-```
-
-Now, let's compare the output of these models.
-
-```{r}
-fit_epoch_1$sigma
-fit_epoch_2$sigma
-```
+I find the between-subject variability to be greater for model 1, but not dramatically.
