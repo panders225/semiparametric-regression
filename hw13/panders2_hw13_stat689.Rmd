@@ -5,21 +5,24 @@ date: "4/11/2018"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
+```{r, message=FALSE}
+rm(list=ls())
+library("tidyverse")
 library("mgcv")
 ```
 
 
 ```{r}
 colon <- read.csv('/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/colon_cancer.csv')
-names(colon) <- tolower(names(colon))
 str(colon)
 ```
 
 # Question 1
 What percentage of the sample died?
 ```{r}
+print("Sample death contingency table: ")
 table(colon$colon_cc)
+cat("\nSample death proportions: \n")
 table(colon$colon_cc) / nrow(colon)
 ```
 50% of the sample died from colon cancer.
@@ -29,18 +32,19 @@ Run a Cox regression with age and BMI entering linearly; show output and code.
 
 ```{r}
 # mgcv expects the weights parameter to hold the censoring info.  0 for censored, 1 for event
+# colon_cc = 0 in case of survival (censor), 1 if event occurs 
 cox_mod <- mgcv::gam(personyrs ~ age + bmi
                      , weights=colon_cc
                      , data=colon
                      , family="cox.ph"
                      )
-summary(cox_mod)
+mgcv::summary.gam(cox_mod)
 ```
 
 # Question 3
-Describe the results from the above regression.
+Describe the results from the above regression, in terms of significance.
 
-Both terms in the model, _age_ and _bmi_, are statistically significant.  Each term is positively associated with the response, time since diagnosis with colon cancer.
+Both terms in the model, _age_ and _bmi_, are statistically significant.  Each term is positively associated with the response: time since diagnosis with colon cancer.
 
 # Question 4
 Run a Cox regression with _age_ and _bmi_ entering as smooth terms.
@@ -65,14 +69,19 @@ Try to compare the models using your favorite method.
 anova(cox_mod, cox_mod_two, test="Chisq")
 ```
 
-It appears that smoothing the terms is necessary.
+The significant test statistic indicates appears that smoothing the terms is necessary.
 
 # Question 7
-Plot the smooths, their pointwise CI's, and the Cox residuals.
+Plot the smooths, their pointwise confidence intervals, and the Cox residuals.
 
 ```{r}
 # plot the smoothed terms first
-mgcv::plot.gam(cox_mod_two, shade=T, shade.col='dodger blue')
+
+mgcv::plot.gam(cox_mod_two, shade=T, shade.col='dodger blue', select=1
+               , main="Smoothed Age Term")
+
+mgcv::plot.gam(cox_mod_two, shade=T, shade.col='dodger blue', select=2
+               , main="Smoothed BMI Term")
 ```
 
 ```{r}
@@ -104,7 +113,8 @@ survival_plotter <- function(subjectnum=1, np=300, dset, mod){
                         plot(newd$personyrs, fv$fit, type="l", lwd=2
                              , xlim=c(0, 12), ylim=c(0, 1)
                              , xlab="personyrs", ylab="survival probability"
-                             , main = substitute(paste("Subject = ",m),list(m = subjectnum))
+                             , main = substitute(paste("Survival Probability; Subject = ",m)
+                                                 ,list(m = subjectnum))
                         )
                         
                         se <- fv$se.fit / fv$fit
@@ -115,8 +125,8 @@ survival_plotter <- function(subjectnum=1, np=300, dset, mod){
 
 ```{r}
 # pick random people to plot
-set.seed(1738)
-cases <- ceiling(runif(4, 0, nrow(colon)))
+set.seed(1740)
+cases <- sort(ceiling(runif(4, 0, nrow(colon))))
 for (i in 1:length(cases))
   survival_plotter(subjectnum=cases[i], np=300, dset=colon, mod=cox_mod_two)
 ```
