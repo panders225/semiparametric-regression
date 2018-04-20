@@ -1,0 +1,84 @@
+---
+title: "Homework 14; STAT 689"
+author: "Philip Anderson; panders2@tamu.edu"
+date: "4/30/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library("tidyverse")
+library("vioplot")
+library("mgcv")
+```
+
+```{r}
+sim <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/OPEN_sim.csv")
+names(sim) <- tolower(names(sim))
+str(sim)
+```
+
+# Question 1
+Compare the true %CFP to the average %CFP estimated by each instrument (avgFFQ, avgRecall, avgBio); make a boxplot containing the errors of the three instruments.
+
+```{r}
+# to start with, I am not going to modify the errors
+ffq_error <- sim$truth - sim$avgffq
+recall_error <- sim$truth - sim$avgrecall
+bio_error <- sim$truth - sim$avgbio
+```
+
+```{r}
+boxplot(ffq_error, recall_error, bio_error
+        , names = c("FFQ", "Recall", "Bio")
+        , xlab="Measurement Approach"
+        , ylab="Measurement Error"
+        , main="BoxPlot for the Three Measurement Approaches"
+        )
+
+```
+
+I am also going to include a violin plot becaue I find the distribution aspect useful.
+
+```{r}
+vioplot::vioplot(ffq_error, recall_error, bio_error, col="dodgerblue"
+              , names = c("FFQ", "Recall", "Bio")
+                 )
+title("ViolinPlot for the Three Measurement Approaches")
+```
+
+Based on the above graphics, I believe that the Biomarker measurement approach is the best of the three.  Each approach is very similar in terms of mean error, but the Biomarker approach is decidedly lower variance than the other two.  To me, this gives some indication that it could be more reliable than the other approaches.
+
+# Question 2
+Fit two random intercept spline models with the responses being the biomarkers, and the predictors being FFQ and 24hr summary.
+
+
+```{r}
+mod_one <- mgcv::gamm(bio ~ s(ffq)
+                     , random=list(id= ~ 1)
+                     , data=sim
+                      )
+summary(mod_one$gam)
+```
+
+
+```{r}
+mod_two <- mgcv::gamm(bio ~ s(recall)
+                     , random=list(id= ~ 1)
+                     , data=sim
+                      )
+summary(mod_two$gam)
+```
+
+From the above output, it appears that both FFQ and 24hr. are significant predictors of the number of Biomarkers, but FFQ is more strongly associated.
+
+# Question 3
+What are the between and within standard deviations of the two fits?
+
+
+# Question 4
+
+
+```{r}
+
+
+```
