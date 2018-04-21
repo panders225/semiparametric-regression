@@ -12,6 +12,11 @@ library("mgcv")
 ```
 
 ```{r}
+rm(list=ls())
+```
+
+```{r}
+# bring in data
 sim <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/OPEN_sim.csv")
 names(sim) <- tolower(names(sim))
 str(sim)
@@ -21,10 +26,17 @@ str(sim)
 Compare the true %CFP to the average %CFP estimated by each instrument (avgFFQ, avgRecall, avgBio); make a boxplot containing the errors of the three instruments.
 
 ```{r}
-# to start with, I am not going to modify the errors
-ffq_error <- sim$truth - sim$avgffq
-recall_error <- sim$truth - sim$avgrecall
-bio_error <- sim$truth - sim$avgbio
+# note that there is some repitition in this data.  
+# For more accurate variance representations within the boxplot, I will
+# deduplicate the table so we only have one 'average' measurement per id number
+# this will halve the number of records in the table
+dedup <- sim %>% 
+  dplyr::select(truth, avgffq, avgrecall, avgbio) %>%
+  unique()
+
+ffq_error <- dedup$truth - dedup$avgffq
+recall_error <- dedup$truth - dedup$avgrecall
+bio_error <- dedup$truth - dedup$avgbio
 ```
 
 ```{r}
@@ -48,6 +60,7 @@ title("ViolinPlot for the Three Measurement Approaches")
 
 Based on the above graphics, I believe that the Biomarker measurement approach is the best of the three.  Each approach is very similar in terms of mean error, but the Biomarker approach is decidedly lower variance than the other two.  To me, this gives some indication that it could be more reliable than the other approaches.
 
+
 # Question 2
 Fit two random intercept spline models with the responses being the biomarkers, and the predictors being FFQ and 24hr summary.
 
@@ -69,16 +82,115 @@ mod_two <- mgcv::gamm(bio ~ s(recall)
 summary(mod_two$gam)
 ```
 
-From the above output, it appears that both FFQ and 24hr. are significant predictors of the number of Biomarkers, but FFQ is more strongly associated.
+From the above output, it appears that both FFQ and 24hr recall are significant predictors of the number of Biomarkers, but FFQ is significant at the <1% level, while 24hr recall is significant at the 5% level.
 
 # Question 3
 What are the between and within standard deviations of the two fits?
 
+```{r}
+summary(mod_one$lme)
+```
+
+```{r}
+summary(mod_two$lme)
+```
+
+
+The between-group standard deviation for FFQ is 0.0005797775, while the between-group standard deviation for 24hr is 0.001912287; 24hr has a standard deviation that is over 3 times larger than that of FFQ.
+
+The within-group standard deviation for FFQ is 3.715664, while the within-group standard deviation for the 24hr is 3.983204.
 
 # Question 4
+Display the fitted curves for both the _FFQ_ and _24hr_ in one graph.  Fit them separately and then plot on the same graph.
 
 
 ```{r}
+ng <- 101
 
+cfpg <- seq(from=min(sim$truth)
+            , to=max(sim$truth)
+            , length=ng
+            )
+
+newDataDF_one <- as.data.frame(cfpg)
+
+names(newDataDF_one) <- c("ffq")
+newDataList_one <- as.list(newDataDF_one)
+
+predObj_one <- predict(mod_one$gam, newDataList_one, se=T)
+
+muHatg_one <- 1/(1+exp(-predObj_one$fit))
+aa_one     <- predObj_one$fit + 2*predObj_one$se
+bb_one     <- predObj_one$fit - 2*predObj_one$se
+lowergg_one = 1 / (1 + exp(-bb_one)) 
+uppergg_one = 1 / (1 + exp(-aa_one)) 
 
 ```
+
+```{r}
+newDataDF_two <- as.data.frame(cfpg)
+
+names(newDataDF_two) <- c("recall")
+newDataList_two <- as.list(newDataDF_two)
+
+predObj_two <- predict(mod_two$gam, newDataList_two, se=T)
+
+muHatg_two <- 1/(1+exp(-predObj_two$fit))
+aa_two     <- predObj_two$fit + 2*predObj_two$se
+bb_two     <- predObj_two$fit - 2*predObj_two$se
+lowergg_two = 1 / (1 + exp(-bb_two)) 
+uppergg_two = 1 / (1 + exp(-aa_two)) 
+```
+
+```{r}
+plot(cfpg, muHatg_two, type="n"
+     , xlab="True %CFP Values"
+     , ylab="Predicted Value"
+     , main="Overlap"
+     )
+# ffq 
+polygon(c(cfpg, rev(cfpg)), c(lowergg_one, rev(uppergg_one))
+#        , col="palegreen"
+         , border=T
+#         , fillOddEven = T
+        )
+lines(cfpg, muHatg_one, col="black", lwd=2)
+
+# 24hr recall
+polygon(c(cfpg, rev(cfpg)), c(lowergg_two, rev(uppergg_two))
+#        , col="cadetblue1"
+       , border=T
+#       , fillOddEven=T
+        )
+lines(cfpg, muHatg_two, col="black", lwd=2)
+rug(jitter(sim$truth))
+```
+
+# Question 5
+In the models from _Question 2_, add _age_ and _BMI_ as linear predictors.  Which are statistically significant?
+
+```{r}
+mod_five_one <- mgcv::gamm(bio ~ s(ffq) + age + bmi
+                           , random=list(id = ~ 1)
+                           , data=sim
+                           )
+summary(mod_five_one$gam)
+```
+
+
+```{r}
+mod_five_two <- mgcv::gamm(bio ~ s(recall) + age + bmi
+                           , random=list(id = ~ 1)
+                           , data=sim
+                           )
+summary(mod_five_two$gam)
+```
+
+In the random-intercept model of _Biomarkers_ on _FFQ_, _BMI_ is significant, along with the smoothed _FFQ_ term.
+
+In the random-intercept model of _Biomarkers_ on _24hr_, _BMI_ is highly significant, but the smoothed _24hr_ term has lost its significance, when compared with the previously fit model.
+
+
+
+
+
