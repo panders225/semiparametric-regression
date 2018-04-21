@@ -1,0 +1,92 @@
+---
+title: "Assignment 15; STAT 689"
+author: "Philip Anderson; panders2@tamu.edu"
+date: "4/21/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library("tidyverse")
+library("mgcv")
+```
+
+```{r}
+rm(list=ls())
+```
+
+```{r}
+# bring in data
+sim <- read.csv("/Users/panders2/Documents/schools/tamu/stat_689/homework/semiparametric-regression/misc/OPEN_sim.csv")
+names(sim) <- tolower(names(sim))
+str(sim)
+```
+
+# Question 1
+Run a random-intercept logistic spline regression with Y=indicator that Bio < 27.5, X=FFQ (spline), and Z=(Age, BMI) (linear).
+
+```{r}
+# generate a binary class for Biomarkers
+sim$bio_bin <- ifelse(sim$bio < 27.5, 1, 0)
+# check
+summary(sim[sim$bio_bin==1, ]$bio)
+summary(sim[sim$bio_bin==0, ]$bio)
+```
+
+```{r}
+mod_one <- mgcv::gamm(bio_bin ~ s(ffq) + age + bmi
+                      , random=list(id = ~ 1)
+                      , family=binomial
+                      , data=sim
+                      )
+```
+
+# Question 2
+Which among X and Z are statistically significant predictors?
+
+```{r}
+summary(mod_one$gam)
+```
+
+Of the included predictor variables, only _X_, or the smoothed _FFQ_ term is statistically significant.
+
+# Question 3
+Graph the fitted probabilities for people who are 55 years old and whose BMI = 25.
+
+```{r}
+ng <- 101
+cfpg <- seq(from=min(sim$ffq)
+            , to=max(sim$ffq)
+            , length=ng
+              )
+newData <- as.data.frame(cbind(cfpg
+              , rep(55, ng)
+              , rep(25, ng)
+                              )
+                        )
+names(newData) <- c("ffq", "age", "bmi")
+newDataList <- as.list(newData)
+
+predObj <- predict(mod_one$gam, newdata=newDataList, se=T)
+
+muHatg <- 1/(1+exp(-predObj$fit))
+aa     <- predObj$fit + 2*predObj$se
+bb     <- predObj$fit - 2*predObj$se
+lowergg <- 1 / (1 + exp(-bb)) 
+uppergg <- 1 / (1 + exp(-aa)) 
+
+```
+
+```{r}
+plot(cfpg, muHatg, type="n", main="Fitted Probabilities for Individuals 55 years old with BMI=25")
+polygon(c(cfpg, rev(cfpg))
+        , c(lowergg, rev(uppergg))
+        , col="cadetblue1"
+        , border=F
+        )
+lines(cfpg, muHatg, lwd=2)
+rug(sim$ffq)
+```
+
+
+
+

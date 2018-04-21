@@ -122,8 +122,8 @@ predObj_one <- predict(mod_one$gam, newDataList_one, se=T)
 muHatg_one <- 1/(1+exp(-predObj_one$fit))
 aa_one     <- predObj_one$fit + 2*predObj_one$se
 bb_one     <- predObj_one$fit - 2*predObj_one$se
-lowergg_one = 1 / (1 + exp(-bb_one)) 
-uppergg_one = 1 / (1 + exp(-aa_one)) 
+lowergg_one <- 1 / (1 + exp(-bb_one)) 
+uppergg_one <- 1 / (1 + exp(-aa_one)) 
 
 ```
 
@@ -138,8 +138,8 @@ predObj_two <- predict(mod_two$gam, newDataList_two, se=T)
 muHatg_two <- 1/(1+exp(-predObj_two$fit))
 aa_two     <- predObj_two$fit + 2*predObj_two$se
 bb_two     <- predObj_two$fit - 2*predObj_two$se
-lowergg_two = 1 / (1 + exp(-bb_two)) 
-uppergg_two = 1 / (1 + exp(-aa_two)) 
+lowergg_two <- 1 / (1 + exp(-bb_two)) 
+uppergg_two <- 1 / (1 + exp(-aa_two)) 
 ```
 
 ```{r}
