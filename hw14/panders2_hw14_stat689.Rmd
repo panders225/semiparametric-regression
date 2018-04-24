@@ -58,7 +58,7 @@ vioplot::vioplot(ffq_error, recall_error, bio_error, col="dodgerblue"
 title("ViolinPlot for the Three Measurement Approaches")
 ```
 
-Based on the above graphics, I believe that the Biomarker measurement approach is the best of the three.  Each approach is very similar in terms of mean error, but the Biomarker approach is decidedly lower variance than the other two.  To me, this gives some indication that it could be more reliable than the other approaches.
+Based on the above graphics, I believe that the Biomarker measurement approach is the best of the three.  Each approach is very similar in terms of mean error, but the Biomarker approach has decidedly lower variance than the other two.  To me, this gives some indication that it could be more reliable than the other approaches.
 
 
 # Question 2
@@ -150,20 +150,20 @@ plot(cfpg, muHatg_two, type="n"
      )
 # ffq 
 polygon(c(cfpg, rev(cfpg)), c(lowergg_one, rev(uppergg_one))
-#        , col="palegreen"
          , border=T
-#         , fillOddEven = T
+         , lty=2
+         , lwd=2
         )
-lines(cfpg, muHatg_one, col="black", lwd=2)
+lines(cfpg, muHatg_one, col="black", lty=2, lwd=2)
 
 # 24hr recall
 polygon(c(cfpg, rev(cfpg)), c(lowergg_two, rev(uppergg_two))
-#        , col="cadetblue1"
        , border=T
-#       , fillOddEven=T
+       , lwd=2
         )
 lines(cfpg, muHatg_two, col="black", lwd=2)
 rug(jitter(sim$truth))
+legend("bottomright", c("FFQ", "24hr Recall"), lty=c(2,1), lwd=c(2,2))
 ```
 
 # Question 5
